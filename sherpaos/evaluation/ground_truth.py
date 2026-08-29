@@ -63,6 +63,8 @@ class ScenarioGroundTruth:
     true_slope_deg: float
     disturbance_active: bool
     actuator_health: float
+    tilt_from_vertical_deg: float
+    planted_foot_slip_mps: float
     true_unsafe: bool
 
 

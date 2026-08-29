@@ -201,6 +201,8 @@ def run_episode(
                 true_slope_deg=scenario.slope_deg,
                 disturbance_active=disturbance_active_this_period,
                 actuator_health=scenario.actuator_health,
+                tilt_from_vertical_deg=tilt_deg,
+                planted_foot_slip_mps=slip_mps,
                 true_unsafe=unsafe,
             )
         )

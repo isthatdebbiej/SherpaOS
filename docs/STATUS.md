@@ -1,9 +1,9 @@
 # STATUS.md — current state
 
-**Last updated:** 2026-08-29 12:37 PT  
-**Base SHA:** `2382a8c` (`checkpoint-1-smoke`)  
-**Working tree:** uncommitted integration checkpoint; human must review/commit  
-**Test state:** 127 tests passed under Codex's isolated Python 3.13 environment; Ruff green
+**Last updated:** 2026-08-29 PT
+**Base SHA:** `66f0979` (`main` before Playground preparation)
+**Working tree:** uncommitted Playground/Vultr integration; review and commit before cloud evidence
+**Test state:** full suite and Ruff green under Codex's isolated environment; four Vultr shell scripts pass `bash -n`
 
 ## Implemented
 
@@ -21,6 +21,12 @@
 - Executable CLI: `sherpa preflight`, `sherpa test`, `sherpa simulate`, and
   `sherpa demo --offline`.
 - Checksum-verified nominal and hazard demo smoke run.
+- Isolated, pinned MuJoCo Playground v0.2.0 bootstrap with CUDA JAX GPU gate.
+- Flat- and rough-terrain G1 reset/step smoke checks with non-finite rejection.
+- Explicit Playground observation-to-telemetry adapter that rejects privileged truth.
+- Rollout evidence metadata with code/Playground SHAs, GPU/JAX identity, policy hash,
+  provenance, license, command, seed, and artifact checksums.
+- Vultr clean-SHA validation/evidence packaging and optional rscope viewer launcher.
 
 ## Verified
 
@@ -41,8 +47,9 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 
 ## Next three tasks
 
-1. Human reviews and commits this integration checkpoint, then reruns official evidence
-   from the clean SHA so manifests do not represent a dirty tree.
-2. Implement paired evaluator/baselines and quantify nominal progress, unsafe
-   continuation, false HOLD, intervention timing, and guard ablations over fixed seeds.
-3. Add deterministic programmatic MP4 capture and the two-minute comparison view.
+1. Review and commit this integration checkpoint; Vultr validation intentionally refuses
+   dirty-tree evidence.
+2. Run `scripts/vultr_playground_smoke.sh` on the provisioned GPU and retrieve its logs.
+3. Obtain or train a compatible, licensed G1 policy, wire its task-specific observation
+   layout to the adapter, and generate a supervised MP4 rollout. Environment smoke alone
+   is not locomotion evidence.

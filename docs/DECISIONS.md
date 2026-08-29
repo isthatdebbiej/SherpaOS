@@ -104,3 +104,13 @@ are implemented as CLI surface + local-only stand-ins (they validate preflight
 conditions and can run a local shard) rather than issuing real HF/Vultr API calls. Wiring
 real cloud calls is left for whoever has the account/credentials, per plan.md section 6's
 preflight-refusal contract, which this local stand-in already enforces.
+## 2026-08-29 — Learned scope frozen to the temporal risk supervisor
+
+The only model trained during the hackathon is a compact temporal SherpaOS risk model.
+It consumes 1–3 seconds of onboard-observable telemetry and emits mobility risk,
+dynamics/body risk, and confidence. It never controls joints. Telemetry health, battery,
+geography, policy hysteresis, and hard action floors remain deterministic. Locomotion
+policy training/fine-tuning, Transformers, VLAs, and end-to-end control are out of scope.
+Simulator observations and privileged labels are stored separately; evaluator truth now
+retains tilt and planted-foot slip magnitude so targets describe physical outcomes rather
+than merely copying scenario parameters.

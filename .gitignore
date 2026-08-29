@@ -16,6 +16,7 @@ build/
 .env.*
 third_party/mujoco_menagerie/
 artifacts/demo/*.mp4
+artifacts/playground/
 artifacts/incidents/*.json
 !artifacts/incidents/.gitkeep
 *.npz

@@ -1,0 +1,42 @@
+model:
+  type: tcn
+  window_seconds: 2.0
+  sample_rate_hz: 50
+  input_width: 103
+  channels: [64, 64, 32]
+  kernel_size: 5
+  dropout: 0.10
+  outputs: [mobility_risk, dynamics_risk]
+  confidence: calibrated
+
+data:
+  horizon_seconds: 1.0
+  split_seed: 20260829
+  split_by: scenario_group
+  train_fraction: 0.70
+  validation_fraction: 0.15
+  test_fraction: 0.15
+  observations_and_labels_separate: true
+  forbidden_inputs:
+    - true_friction
+    - true_slope_deg
+    - planted_foot_slip_mps
+    - disturbance_active
+    - actuator_health
+    - true_unsafe
+    - battery
+    - geography
+
+training:
+  seeds: [17, 42, 91]
+  maximum_epochs: 40
+  early_stopping_patience: 5
+  batch_size: 256
+  learning_rate: 0.001
+  device_preference: [cuda, cpu]
+
+shipping_gates:
+  require_deterministic_baseline_improvement: true
+  require_onnx_parity: true
+  require_malformed_input_fallback: true
+  require_held_out_scenario_groups: true

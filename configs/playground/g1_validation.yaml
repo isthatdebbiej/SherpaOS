@@ -1,0 +1,51 @@
+# Versioned acceptance contract for the Vultr MuJoCo Playground lane.
+# A reset/render smoke test is infrastructure evidence, not locomotion evidence.
+environment:
+  flat: G1JoystickFlatTerrain
+  rough: G1JoystickRoughTerrain
+  seed: 42
+
+runtime:
+  require_gpu: true
+  require_cuda_backend: true
+  minimum_rollout_seconds: 20
+
+policy:
+  required_for_rollout: true
+  # Set this on Vultr after obtaining a compatible checkpoint.
+  checkpoint: null
+  expected_sha256: null
+  provenance_url: null
+  license: null
+
+evidence:
+  output_directory: artifacts/playground
+  require_video: true
+  require_metadata: true
+  require_policy_hash: true
+  required_metadata:
+    - commit_sha
+    - dirty_worktree
+    - environment_name
+    - seed
+    - jax_version
+    - jax_backend
+    - gpu_identity
+    - playground_commit
+    - policy_sha256
+    - policy_provenance
+    - command
+
+gates:
+  - id: gpu
+    claim: JAX executes on the provisioned NVIDIA GPU.
+  - id: environment
+    claim: Both official G1 environments reset and step without NaN values.
+  - id: policy
+    claim: A licensed, hashed, environment-compatible locomotion policy is loaded.
+  - id: rollout
+    claim: The policy completes a commanded visual rollout; random actions do not pass.
+  - id: supervisor
+    claim: Playground sensor observations feed all five SherpaOS guards without ground-truth leakage.
+  - id: capture
+    claim: MP4, metrics, logs, configuration, and provenance are copied off the instance.
