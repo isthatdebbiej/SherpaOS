@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from sherpaos.datasets.cli import data_app
 from sherpaos.evidence.bundle import verify_bundle, write_evidence_bundle
 from sherpaos.evidence.manifest import build_run_manifest
 from sherpaos.geography.terrain import build_mission_context, load_route
@@ -17,6 +18,7 @@ from sherpaos.sim.scenario import mixed_traction_disturbance_scenario, nominal_s
 from sherpaos.sim.supervisor import SimulationSupervisorAdapter
 
 app = typer.Typer(no_args_is_help=True, help="Offline expedition-risk supervisor tools.")
+app.add_typer(data_app, name="data")
 
 
 def _scenario(name: str, seed: int):

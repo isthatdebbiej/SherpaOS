@@ -1,9 +1,9 @@
 # STATUS.md — current state
 
 **Last updated:** 2026-08-29 PT
-**Base SHA:** `66f0979` (`main` before Playground preparation)
-**Working tree:** uncommitted Playground/Vultr integration; review and commit before cloud evidence
-**Test state:** full suite and Ruff green under Codex's isolated environment; four Vultr shell scripts pass `bash -n`
+**Base SHA:** `f8562169` (dataset-pipeline implementation base)
+**Working tree:** dataset pipeline implementation ready for commit
+**Test state:** Ruff green; full pytest suite green (150 passed); 2-episode dataset contract GREEN
 
 ## Implemented
 
@@ -53,3 +53,24 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 3. Obtain or train a compatible, licensed G1 policy, wire its task-specific observation
    layout to the adapter, and generate a supervised MP4 rollout. Environment smoke alone
    is not locomotion evidence.
+
+## Dataset pipeline checkpoint (2026-08-29 PT)
+
+- Added frozen 200-episode scenario/config contracts: 50 nominal, 50 mobility,
+  50 dynamics, and 50 combined controller-only episodes.
+- Added deterministic, resumable 10-episode NPZ shards with 500 control steps,
+  100-sample windows, 50-sample prediction horizon, and stride 10.
+- Observation arrays are fixed at 103 onboard-observable features; privileged
+  friction/slope/slip/actuator/disturbance/fall truth remains under `labels/`.
+- Added `sherpa data generate`, `sherpa data validate`, and `sherpa data split` only.
+- Validation rejects count, integrity, leakage, alignment, finite-value, width,
+  duplicate-ID, group-overlap, missing-shard, and positive-rate failures.
+- Acceptance commands completed GREEN for the allowed two-episode local contract;
+  mobility positive rate was 0.50 and feature width was 103.
+- Full suite: 150 passed. Ruff: green.
+
+## Next three tasks (dataset pipeline)
+
+1. Push the committed dataset-pipeline SHA and clone that exact SHA on Vultr.
+2. Run exactly 200 episodes on Vultr, then validate and freeze checksums.
+3. Download and checksum-verify the immutable dataset before any later training task.

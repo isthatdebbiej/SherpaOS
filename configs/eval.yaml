@@ -1,0 +1,6 @@
+version: 1
+dataset_contract:
+  expected_episodes: 200
+  expected_feature_width: 103
+  mobility_positive_rate: [0.05, 0.80]
+  dynamics_positive_rate: [0.05, 0.80]

@@ -1,0 +1,8 @@
+version: 1
+sources:
+  - id: mujoco-menagerie-unitree-g1
+    kind: simulator_asset
+    path: third_party/mujoco_menagerie/unitree_g1/scene.xml
+    use: controller-only simulated telemetry and evaluator-only labels
+    redistribution: repository-vendored asset; see third_party/ATTRIBUTIONS.md
+

@@ -1,0 +1,20 @@
+version: 1
+dataset:
+  episodes: 200
+  control_steps: 500
+  control_hz: 50
+  window_seconds: 2
+  prediction_horizon_seconds: 1
+  stride_samples: 10
+  shard_episodes: 10
+  seed_base: 2026082900
+categories:
+  nominal:
+    episodes: 50
+  mobility:
+    episodes: 50
+  dynamics:
+    episodes: 50
+  combined:
+    episodes: 50
+
