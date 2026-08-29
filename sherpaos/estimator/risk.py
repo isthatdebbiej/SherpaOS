@@ -171,12 +171,20 @@ class RiskEstimator:
             return _fallback_estimate(age_seconds)
 
 
-def _score(f: Features) -> RiskEstimate:
+def data_quality_gate(f: Features) -> tuple[float, float, list[ReasonCode]]:
+    """The "can only push toward worse" data-quality block, factored out so
+    `sherpaos.policy.guards.telemetry_health_report` can build the
+    telemetry-health `GuardReport` from the exact same logic `_score` uses,
+    instead of duplicating it. Returns (score_floor, confidence, reasons) --
+    `confidence` here has already had every applicable ceiling applied
+    (including the warm-up ramp), so callers should treat it as final for
+    the "how much can we trust *this sample*" question, not just fold their
+    own confidence on top of a partial value.
+    """
     reasons: list[ReasonCode] = []
     score_floor = 0.0
     confidence = 1.0
 
-    # --- data-quality gating (can only push toward "worse") ---
     if f.has_nan:
         score_floor = max(score_floor, NAN_SCORE_FLOOR)
         confidence = min(confidence, NAN_CONFIDENCE_CEILING)
@@ -205,14 +213,22 @@ def _score(f: Features) -> RiskEstimate:
         )
         confidence = min(confidence, warm_up)
 
-    # --- behavioral risk components, each folded to 0..1 ---
-    orientation_component = _clip_score(
+    return score_floor, confidence, reasons
+
+
+def orientation_component(f: Features) -> float:
+    """See `sherpaos.policy.guards.dynamics_report` -- shared with `_score`."""
+    return _clip_score(
         (abs(f.roll) + abs(f.pitch)) / ORIENT_ANGLE_SCALE * 0.5
         + f.angular_velocity_magnitude / ANGULAR_VELOCITY_MAG_SCALE * 0.25
         + (f.roll_std + f.pitch_std) / ORIENT_STD_SCALE * 0.15
         + f.angular_velocity_std / ANGULAR_VELOCITY_STD_SCALE * 0.10
     )
-    body_component = _clip_score(
+
+
+def body_component(f: Features) -> float:
+    """See `sherpaos.policy.guards.dynamics_report` -- shared with `_score`."""
+    return _clip_score(
         f.joint_velocity_residual / JOINT_VELOCITY_RESIDUAL_SCALE * 0.7
         + (
             (f.joint_effort_residual / JOINT_EFFORT_RESIDUAL_SCALE * 0.3)
@@ -220,27 +236,45 @@ def _score(f: Features) -> RiskEstimate:
             else 0.0
         )
     )
-    asymmetry_component = _clip_score(f.asymmetry_score / ASYMMETRY_SCALE)
-    slip_component = _clip_score(f.slip_proxy_score)
+
+
+def asymmetry_component(f: Features) -> float:
+    """See `sherpaos.policy.guards.dynamics_report` -- shared with `_score`."""
+    return _clip_score(f.asymmetry_score / ASYMMETRY_SCALE)
+
+
+def slip_component(f: Features) -> float:
+    """See `sherpaos.policy.guards.mobility_report` -- shared with `_score`."""
+    return _clip_score(f.slip_proxy_score)
+
+
+def _score(f: Features) -> RiskEstimate:
+    score_floor, confidence, reasons = data_quality_gate(f)
+    reasons = list(reasons)
+
+    orientation_component_val = orientation_component(f)
+    body_component_val = body_component(f)
+    asymmetry_component_val = asymmetry_component(f)
+    slip_component_val = slip_component(f)
 
     weighted = (
-        WEIGHT_ORIENTATION * orientation_component
-        + WEIGHT_BODY * body_component
-        + WEIGHT_ASYMMETRY * asymmetry_component
-        + WEIGHT_SLIP * slip_component
+        WEIGHT_ORIENTATION * orientation_component_val
+        + WEIGHT_BODY * body_component_val
+        + WEIGHT_ASYMMETRY * asymmetry_component_val
+        + WEIGHT_SLIP * slip_component_val
     )
 
     score = _clip_score(max(score_floor, weighted))
 
-    if orientation_component > ORIENT_ELEVATED_THRESHOLD:
+    if orientation_component_val > ORIENT_ELEVATED_THRESHOLD:
         reasons.append(ReasonCode.ORIENTATION_INSTABILITY)
-    if body_component > BODY_ANOMALY_THRESHOLD:
+    if body_component_val > BODY_ANOMALY_THRESHOLD:
         reasons.append(ReasonCode.BODY_ANOMALY)
-    if asymmetry_component > ASYMMETRY_THRESHOLD:
+    if asymmetry_component_val > ASYMMETRY_THRESHOLD:
         reasons.append(ReasonCode.ASYMMETRY_DETECTED)
-    if slip_component > SLIP_HIGH_THRESHOLD:
+    if slip_component_val > SLIP_HIGH_THRESHOLD:
         reasons.append(ReasonCode.SLIP_RISK_HIGH)
-    elif slip_component > SLIP_ELEVATED_THRESHOLD:
+    elif slip_component_val > SLIP_ELEVATED_THRESHOLD:
         reasons.append(ReasonCode.SLIP_RISK_ELEVATED)
 
     confidence = _clip_confidence(confidence)
