@@ -1,0 +1,1 @@
+"""SherpaOS cli module."""
