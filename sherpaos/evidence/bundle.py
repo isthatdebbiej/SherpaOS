@@ -39,6 +39,8 @@ from sherpaos.contracts import (
     ActuationReceipt,
     GuardAction,
     GuardDecision,
+    GuardName,
+    GuardReport,
     ReasonCode,
     RobotTelemetry,
     RunManifest,
@@ -98,6 +100,8 @@ def telemetry_from_dict(data: dict) -> RobotTelemetry:
         gait_mode=data.get("gait_mode"),
         battery_fraction=data.get("battery_fraction"),
         battery_voltage=data.get("battery_voltage"),
+        battery_current_a=data.get("battery_current_a"),
+        battery_temperature_c=data.get("battery_temperature_c"),
         source=TelemetrySource(data.get("source", TelemetrySource.SIM.value)),
         valid=data.get("valid", True),
         field_provenance=dict(data.get("field_provenance") or {}),
@@ -109,6 +113,17 @@ def decision_to_dict(decision: GuardDecision) -> dict:
 
 
 def decision_from_dict(data: dict) -> GuardDecision:
+    guard_reports = tuple(
+        GuardReport(
+            guard=GuardName(report["guard"]),
+            score=report["score"],
+            confidence=report["confidence"],
+            reason_codes=tuple(ReasonCode(code) for code in report.get("reason_codes", ())),
+            recommended_action=GuardAction(report["recommended_action"]),
+            provenance=dict(report.get("provenance") or {}),
+        )
+        for report in data.get("guard_reports", ())
+    )
     return GuardDecision(
         decision_id=data["decision_id"],
         action=GuardAction(data["action"]),
@@ -120,6 +135,7 @@ def decision_from_dict(data: dict) -> GuardDecision:
         timestamp=data["timestamp"],
         rules_version=data["rules_version"],
         model_version=data.get("model_version"),
+        guard_reports=guard_reports,
     )
 
 

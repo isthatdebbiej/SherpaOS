@@ -78,6 +78,14 @@ class Scenario:
     actuator_health: float
     sensor_noise_std: float
     seed: int
+    # Synthetic battery inputs. These are scenario parameters, never
+    # evaluator labels, and are emitted with explicit simulated provenance.
+    battery_initial_fraction: float = 0.8
+    battery_discharge_per_s: float = 0.00005
+    battery_idle_current_a: float = 2.0
+    battery_motion_current_a: float = 8.0
+    battery_internal_resistance_ohm: float = 0.03
+    battery_temperature_c: float = 15.0
 
 
 def nominal_scenario(seed: int) -> Scenario:
@@ -94,6 +102,8 @@ def nominal_scenario(seed: int) -> Scenario:
         actuator_health=1.0,
         sensor_noise_std=0.0,
         seed=seed,
+        battery_initial_fraction=0.85,
+        battery_temperature_c=15.0,
     )
 
 
@@ -132,6 +142,11 @@ def mixed_traction_disturbance_scenario(seed: int) -> Scenario:
         actuator_health=1.0,
         sensor_noise_std=sensor_noise_std,
         seed=seed,
+        battery_initial_fraction=0.55,
+        battery_discharge_per_s=0.0002,
+        battery_motion_current_a=18.0,
+        battery_internal_resistance_ohm=0.12,
+        battery_temperature_c=-20.0,
     )
 
 
@@ -156,12 +171,18 @@ def random_scenario(seed: int, regime: str = "train") -> Scenario:
         actuator_health = float(rng.uniform(0.7, 1.0))
         max_force_n = 40.0
         sensor_noise_std = float(rng.uniform(0.0, 0.01))
+        battery_initial_fraction = float(rng.uniform(0.45, 1.0))
+        battery_temperature_c = float(rng.uniform(-5.0, 25.0))
+        battery_internal_resistance_ohm = float(rng.uniform(0.02, 0.08))
     else:
         friction = float(rng.uniform(0.03, 1.0))
         slope_deg = float(rng.uniform(0.0, 8.0))
         actuator_health = float(rng.uniform(0.15, 1.0))
         max_force_n = 150.0
         sensor_noise_std = float(rng.uniform(0.0, 0.05))
+        battery_initial_fraction = float(rng.uniform(0.08, 1.0))
+        battery_temperature_c = float(rng.uniform(-25.0, 25.0))
+        battery_internal_resistance_ohm = float(rng.uniform(0.02, 0.18))
 
     if rng.random() < 0.5:
         force_n = 0.0
@@ -189,4 +210,9 @@ def random_scenario(seed: int, regime: str = "train") -> Scenario:
         actuator_health=actuator_health,
         sensor_noise_std=sensor_noise_std,
         seed=seed,
+        battery_initial_fraction=battery_initial_fraction,
+        battery_discharge_per_s=float(rng.uniform(0.00002, 0.0005)),
+        battery_motion_current_a=float(rng.uniform(6.0, 22.0)),
+        battery_internal_resistance_ohm=battery_internal_resistance_ohm,
+        battery_temperature_c=battery_temperature_c,
     )

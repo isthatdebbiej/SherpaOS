@@ -56,7 +56,7 @@ def _git_commit_sha(repo_root: Path) -> str:
     """
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "-c", f"safe.directory={repo_root.as_posix()}", "rev-parse", "HEAD"],
             cwd=repo_root,
             capture_output=True,
             text=True,

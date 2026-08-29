@@ -47,10 +47,10 @@ subtly wrong):
     consumers should treat `commanded_velocity[0]` as `speed_scale`.
   - `gait_mode`: `"stepping"` or `"hold"`, passed in by the caller (which
     already knows the guard's `hold` decision -- see `runner.py`).
-  - `battery_fraction`/`battery_voltage`: always `None`. There is no
-    battery model in this pass; fabricating a value would violate the
-    "never invent data" spirit of `RobotTelemetry.valid`/
-    `field_provenance`.
+  - battery fields: this adapter leaves them `None`. The runner's explicit
+    synthetic battery model enriches the sample afterward and marks each
+    field's provenance as simulated; this low-level MuJoCo reader never
+    fabricates battery state itself.
 """
 
 from __future__ import annotations

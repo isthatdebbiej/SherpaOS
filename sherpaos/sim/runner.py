@@ -48,6 +48,7 @@ import numpy as np
 from sherpaos.contracts import RobotTelemetry
 from sherpaos.evaluation.ground_truth import ScenarioGroundTruth, classify_unsafe
 from sherpaos.sim import disturbances
+from sherpaos.sim.battery import enrich_battery_telemetry
 from sherpaos.sim.controller import STAND_KEYFRAME_NAME, PDStepController
 from sherpaos.sim.mujoco_source import MuJoCoTelemetrySource
 from sherpaos.sim.scenario import Scenario
@@ -173,6 +174,12 @@ def run_episode(
             monotonic_time=data.time,
             speed_scale=speed_scale,
             gait_mode=gait_mode,
+        )
+        sample = enrich_battery_telemetry(
+            sample,
+            scenario,
+            elapsed_seconds=data.time,
+            speed_scale=speed_scale,
         )
         if scenario.sensor_noise_std > 0.0:
             sample = disturbances.inject_sensor_noise(sample, scenario.sensor_noise_std, noise_rng)

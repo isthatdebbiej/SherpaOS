@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 import uuid
 
-from sherpaos.contracts import GuardAction, GuardDecision, ReasonCode
+from sherpaos.contracts import GuardAction, GuardDecision, GuardReport, ReasonCode
 from sherpaos.estimator.risk import RiskEstimate
 
 RULES_VERSION = "policy-v1.0.0"
@@ -129,7 +129,12 @@ class PolicyStateMachine:
         self._bad_data_streak: int = 0
         self._last_change_time: float | None = None
 
-    def decide(self, risk: RiskEstimate, now: float) -> GuardDecision:
+    def decide(
+        self,
+        risk: RiskEstimate,
+        now: float,
+        guard_reports: tuple[GuardReport, ...] = (),
+    ) -> GuardDecision:
         try:
             action, extra_reasons = self._decide_action(risk, now)
         except Exception:
@@ -169,6 +174,7 @@ class PolicyStateMachine:
             requested_speed_limit=requested_speed_limit,
             timestamp=now,
             rules_version=RULES_VERSION,
+            guard_reports=guard_reports,
         )
 
     def _decide_action(
