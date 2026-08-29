@@ -204,6 +204,7 @@ class MissionContext:
     slope_deg: float | None
     route_segment: str | None
     distance_to_safe_waypoint_m: float | None
+    exposure_class: str | None  # e.g. "LOW"/"MODERATE"/"HIGH"/"SEVERE"
 
     terrain_source: str
     terrain_version: str
