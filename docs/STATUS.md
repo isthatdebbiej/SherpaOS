@@ -1,7 +1,9 @@
 # STATUS.md — current state
 
-**Last updated:** 2026-08-29 11:24 PT
-**Green SHA:** none yet (scaffold not committed)
+**Last updated:** 2026-08-29 11:45 PT
+**Green SHA:** `208cdea` (checkpoint-0-scaffold) — clean tree, `.venv` healthy, all deps import
+(plan.md's noted "dubious ownership"/broken-venv issue does not reproduce in this
+environment; this repo was git-initialized fresh under the active account)
 **Test state:** no tests written yet
 
 ## What's done

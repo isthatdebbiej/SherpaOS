@@ -6,10 +6,11 @@ should be updated.
 
 ## Product
 
-SherpaOS is an offline, auditable mobility-risk supervisor for Unitree G1. It consumes
-only onboard-observable telemetry, detects deteriorating mobility/dynamics, and requests
-one of `PASS`, `LIMIT_SPEED`, `REQUEST_HOLD`. It sits above an existing locomotion
-controller.
+SherpaOS is an offline, auditable expedition-risk supervisor for Unitree G1. It combines
+onboard telemetry with locally cached terrain context, evaluates five independent guard
+families (mobility, dynamics/body, telemetry-health, battery-margin, geographic-risk),
+and requests one of `PASS`, `LIMIT_SPEED`, `REQUEST_HOLD` via conservative fusion of the
+guards. It sits above an existing locomotion controller.
 
 The core proof: the same hidden traction change or disturbance produces a safer outcome
 with SherpaOS than with (1) controller only, (2) a naive IMU threshold, (3) an
@@ -36,11 +37,19 @@ G1 connection. Those resources improve evidence; none may be a stage dependency.
 9. ONNX export/parity test + latency benchmark (stretch, needs Jetson access).
 10. One-command local demo, one-command evaluation.
 11. Video/repo/description/track submission (human-owned, out of this repo's scope).
+12. Simulated battery guard: state of charge, voltage sag, discharge rate, thermal
+    stress; real fields replace simulated fields through the same contract when
+    available.
+13. Offline geographic-risk guard using a pinned open terrain artifact
+    (`configs/terrain/ebc_route.json`) packaged on-device — see
+    `configs/terrain/PROVENANCE.md`.
 
 ## Explicitly out of scope until every mandatory gate is green
 
-geographic mountain map, energy-to-return model, LiveKit voice, phone teleop, ROS 2
-bridge, Isaac Sim/Lab, TensorRT, second UI, new locomotion policy.
+photorealistic or full-Himalaya 3D rendering, calibrated energy-to-return prediction
+beyond the bounded simulated battery-margin guard, LiveKit voice, phone teleop, ROS 2
+bridge, Isaac Sim/Lab, TensorRT, second UI, new locomotion policy. (The small offline
+geographic-risk artifact/guard itself is in scope — only fancy 3D map rendering is cut.)
 
 ## Simulation fallback (recorded decision)
 

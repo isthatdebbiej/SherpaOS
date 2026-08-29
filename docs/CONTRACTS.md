@@ -13,11 +13,44 @@ fields, `source` (`sim`/`dump`/`g1_live`), `valid` flag, and `field_provenance` 
 **Never add**: true friction, simulator contact ground truth, terrain class, injected-fault
 label, or true fall state. Those are evaluator-only (`sherpaos/evaluation/`).
 
-## GuardDecision
+## GuardReport (per-guard, pre-fusion)
+
+SherpaOS runs five independent guards (see "Guard families" below). Each one emits its
+own `GuardReport`: `guard` (`GuardName`), `score` (0..1), `confidence` (0..1),
+`reason_codes`, `recommended_action`, `provenance` (free-form string map — e.g. which
+telemetry fields or artifact version it used). Nothing in one guard's `GuardReport` may
+depend on another guard's internals.
+
+## GuardDecision (fused)
 
 `action` in `{PASS, LIMIT_SPEED, REQUEST_HOLD}`, plus `score`, `confidence`,
 `reason_codes` (from `sherpaos.contracts.ReasonCode`), `input_age_seconds`,
-`requested_speed_limit`, `timestamp`, `rules_version`, optional `model_version`.
+`requested_speed_limit`, `timestamp`, `rules_version`, optional `model_version`, and
+`guard_reports` (the full tuple of per-guard `GuardReport`s that produced this decision —
+this is what lets the incident timeline and dashboard show "mobility, dynamics,
+telemetry, battery, and geographic reasons" separately, per `docs/plan.md` section 7).
+
+**Fusion rule**: conservative, not averaged. A single high-severity guard must be able to
+drive the fused action (e.g. `REQUEST_HOLD`) even if every other guard reports `PASS` —
+never let four calm guards dilute one alarmed guard's signal into a mid-range average.
+
+## Guard families
+
+1. **Mobility/traction guard** (`GuardName.MOBILITY`) — command-response residuals, IMU
+   instability, joint effort/velocity residuals, asymmetry. Detects reduced operating
+   margin; does not classify literal ice.
+2. **Dynamics/body guard** (`GuardName.DYNAMICS`) — actuator under-response/saturation,
+   vibration, payload change, abnormal effort, external impulse, orientation instability.
+3. **Telemetry-health guard** (`GuardName.TELEMETRY_HEALTH`) — stale, missing, frozen,
+   NaN, malformed, future-dated, or out-of-order telemetry, and inference failure.
+4. **Battery-margin guard** (`GuardName.BATTERY`) — state of charge, voltage sag under
+   load, discharge rate, estimated remaining operating time, temperature when available.
+   Reads `RobotTelemetry.battery_fraction/battery_voltage/battery_current_a/
+   battery_temperature_c`. Simulated input is valid hackathon evidence but must be
+   labeled `sim` (via `RobotTelemetry.source`) and varied across held-out battery
+   scenarios — never presented as a calibrated real-G1 predictor without real telemetry.
+5. **Geographic-risk guard** (`GuardName.GEOGRAPHIC`) — slope, elevation, route exposure,
+   distance to safe waypoint, terrain-data quality, read from `MissionContext` (below).
 
 ## ActuationReceipt
 
@@ -31,6 +64,17 @@ receipt.
 Reproducibility record: commit/config/controller/model/data hashes, dependency lock
 hash, container identity, seed, scenario name, runtime/hardware identity, artifact
 checksums.
+
+## MissionContext
+
+Offline-preprocessed geographic/route context feeding the geographic-risk guard:
+latitude/longitude, elevation, slope, route segment, distance to safe waypoint, terrain
+source/version/CRS, lookup timestamp, validity, resolution, provenance, optional
+wind/temperature context. Loaded once from `configs/terrain/ebc_route.json` (see
+`configs/terrain/PROVENANCE.md`) — **the runtime must never query the internet for
+this**. Missing, out-of-bounds, low-resolution, or stale context must set `valid=False`
+(or an old `lookup_timestamp`) rather than inventing terrain, and must lower the
+geographic guard's confidence accordingly.
 
 ## Adapter boundary rule
 

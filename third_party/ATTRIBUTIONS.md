@@ -9,6 +9,7 @@
 | pytest / pytest-xdist / pytest-cov / Hypothesis | Test harness | see `pyproject.toml` | MIT / MPL-2.0 (Hypothesis) |
 | Ruff | Lint/format | see `pyproject.toml` | MIT |
 | ONNX / ONNX Runtime | Model export/parity (only if a learned model ships) | see `pyproject.toml` | Apache-2.0 / MIT |
+| English Wikipedia (waypoint coordinates/elevations) | `configs/terrain/ebc_route.json` geographic-risk guard artifact | fetched 2026-08-29, see `configs/terrain/PROVENANCE.md` for per-waypoint URLs | CC BY-SA 4.0 (raw geographic facts — coordinates/elevations — are not independently copyrightable, but the source is credited per Wikipedia's terms) |
 
 Update this table whenever a new dependency, pretrained model, or dataset is added, with
 the exact pinned commit/version and license. This file must be accurate before

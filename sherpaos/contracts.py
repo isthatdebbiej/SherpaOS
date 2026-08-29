@@ -15,19 +15,19 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
-class TelemetrySource(str, enum.Enum):
+class TelemetrySource(enum.StrEnum):
     SIM = "sim"
     DUMP = "dump"
     G1_LIVE = "g1_live"
 
 
-class GuardAction(str, enum.Enum):
+class GuardAction(enum.StrEnum):
     PASS = "PASS"
     LIMIT_SPEED = "LIMIT_SPEED"
     REQUEST_HOLD = "REQUEST_HOLD"
 
 
-class ReasonCode(str, enum.Enum):
+class ReasonCode(enum.StrEnum):
     """Shared vocabulary of estimator/policy trigger reasons.
 
     Add new codes here rather than inventing ad-hoc strings elsewhere,
@@ -47,6 +47,29 @@ class ReasonCode(str, enum.Enum):
     LOW_CONFIDENCE = "LOW_CONFIDENCE"
     HYSTERESIS_HOLD = "HYSTERESIS_HOLD"
     RECOVERY_CONFIRMED = "RECOVERY_CONFIRMED"
+
+    # Battery-margin guard
+    BATTERY_MARGIN_LOW = "BATTERY_MARGIN_LOW"
+    BATTERY_VOLTAGE_SAG = "BATTERY_VOLTAGE_SAG"
+    BATTERY_COLD_DERATED = "BATTERY_COLD_DERATED"
+    BATTERY_DATA_UNAVAILABLE = "BATTERY_DATA_UNAVAILABLE"
+
+    # Geographic-risk guard
+    GEOGRAPHIC_STEEP_SLOPE = "GEOGRAPHIC_STEEP_SLOPE"
+    GEOGRAPHIC_HIGH_EXPOSURE = "GEOGRAPHIC_HIGH_EXPOSURE"
+    GEOGRAPHIC_FAR_FROM_SAFE_WAYPOINT = "GEOGRAPHIC_FAR_FROM_SAFE_WAYPOINT"
+    GEOGRAPHIC_CONTEXT_UNAVAILABLE = "GEOGRAPHIC_CONTEXT_UNAVAILABLE"
+    GEOGRAPHIC_CONTEXT_STALE = "GEOGRAPHIC_CONTEXT_STALE"
+
+
+class GuardName(enum.StrEnum):
+    """The five guard families. See docs/CONTRACTS.md 'Guard families'."""
+
+    MOBILITY = "mobility"
+    DYNAMICS = "dynamics"
+    TELEMETRY_HEALTH = "telemetry_health"
+    BATTERY = "battery"
+    GEOGRAPHIC = "geographic"
 
 
 @dataclass(slots=True, frozen=True)
@@ -78,6 +101,8 @@ class RobotTelemetry:
 
     battery_fraction: float | None = None
     battery_voltage: float | None = None
+    battery_current_a: float | None = None
+    battery_temperature_c: float | None = None
 
     source: TelemetrySource = TelemetrySource.SIM
     valid: bool = True
@@ -85,6 +110,25 @@ class RobotTelemetry:
 
     def age_seconds(self, now_monotonic: float) -> float:
         return max(0.0, now_monotonic - self.monotonic_time)
+
+
+@dataclass(slots=True, frozen=True)
+class GuardReport:
+    """Per-guard output before fusion, from one of the five guard families.
+
+    Each guard (mobility, dynamics, telemetry-health, battery, geographic)
+    emits its own score/confidence/reasons/recommended action independently.
+    The policy fuses these conservatively into one GuardDecision — a
+    high-severity guard must not be hidden by averaging it with unrelated
+    low-severity guards. See docs/CONTRACTS.md 'Guard families'.
+    """
+
+    guard: GuardName
+    score: float  # 0..1
+    confidence: float  # 0..1
+    reason_codes: tuple[ReasonCode, ...]
+    recommended_action: GuardAction
+    provenance: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True, frozen=True)
@@ -103,6 +147,7 @@ class GuardDecision:
     timestamp: float
     rules_version: str
     model_version: str | None = None
+    guard_reports: tuple[GuardReport, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
@@ -140,3 +185,34 @@ class RunManifest:
 
     artifact_checksums: dict[str, str] = field(default_factory=dict)
     created_at: str = ""
+
+
+@dataclass(slots=True, frozen=True)
+class MissionContext:
+    """Offline-preprocessed geographic/route context for the geographic-risk
+    guard. Runtime must not query the internet for this — it is loaded once
+    from a locally packaged terrain artifact (see docs/RUNBOOK.md). Missing,
+    out-of-bounds, low-resolution, or stale context must be represented
+    explicitly (`valid=False` / low `resolution_m` / old `lookup_timestamp`)
+    and must lower the geographic guard's confidence rather than inventing
+    terrain.
+    """
+
+    latitude: float | None
+    longitude: float | None
+    elevation_m: float | None
+    slope_deg: float | None
+    route_segment: str | None
+    distance_to_safe_waypoint_m: float | None
+
+    terrain_source: str
+    terrain_version: str
+    coordinate_reference_system: str
+
+    lookup_timestamp: float
+    valid: bool
+    resolution_m: float | None
+    provenance: str
+
+    wind_mps: float | None = None
+    temperature_c: float | None = None

@@ -44,6 +44,47 @@ blocker for the intervention-proof gate.
 Rejected for this pass due to added dependency weight and setup risk; revisit once the
 core estimator/policy/evaluation loop is proven end-to-end.
 
+## 2026-08-29 12:05 PT — Five-guard architecture supersedes the collapsed single estimator
+
+`docs/plan.md` was revised mid-build to specify five independent guard families
+(mobility, dynamics/body, telemetry-health, battery-margin, geographic-risk), each
+emitting its own `GuardReport` (score/confidence/reasons/recommended action/provenance),
+fused conservatively (a high-severity guard must not be diluted by averaging with calm
+guards) into the final `GuardDecision`. This **revises** the 11:24 AM entry above, which
+collapsed IceSense/BodySense/EnergyTerrain into one estimator — that collapse was correct
+for the plan version active at the time, but the plan has since been updated to require
+five separately-reported guards plus two new ones (battery, geographic) that didn't exist
+in `idea.txt` at all. `sherpaos/contracts.py` was extended additively (new `GuardReport`,
+`GuardName`, `MissionContext` dataclasses; new `battery_current_a`/
+`battery_temperature_c` fields on `RobotTelemetry`; new `guard_reports` field on
+`GuardDecision` defaulting to `()`) — nothing existing was renamed or removed, so code
+already written against the old shape keeps working; it just doesn't yet populate the new
+fields until the guard-split/battery/geographic work lands.
+
+Also fixed while touching this file: `TelemetrySource`/`GuardAction`/`ReasonCode` were
+`(str, enum.Enum)` (ruff UP042); switched to `enum.StrEnum` (Python 3.11+, matches
+`requires-python`) for the existing enums and the two new ones.
+
+## 2026-08-29 12:05 PT — Geographic terrain artifact: waypoint route, not a DEM raster
+
+Built `configs/terrain/ebc_route.json` (via `scripts/prepare_terrain_artifact.py`): 8
+named Everest Base Camp trek waypoints (Lukla through Everest Base Camp) with
+Wikipedia-sourced coordinates/elevations (see `configs/terrain/PROVENANCE.md` for
+per-waypoint URLs, fetched 2026-08-29), plus derived slope/distance/exposure fields.
+Chose a small hand-pinned waypoint/route artifact over a gridded DEM raster (e.g.
+SRTM/Copernicus clip via rasterio/GDAL) to avoid a heavy geospatial dependency chain on
+Windows within the session budget, while still being real, sourced, and provenance-
+documented — consistent with `docs/idea.txt`'s "physics matter more than snow textures"
+philosophy applied to terrain data. Distances are great-circle (haversine) between
+waypoints, not actual trail distance — documented as a lower bound, not a calibrated
+hiking distance. `exposure_class` is an explicit bounded heuristic (altitude + local
+slope), not a validated avalanche/exposure model.
+
+**Rejected alternative**: querying a live elevation API (Open-Elevation/OpenTopoData) at
+runtime. Rejected because `docs/plan.md` requires the geographic guard to work with the
+internet absent — the artifact is fetched/prepared once (this step, with network access)
+and committed; runtime only ever reads the local JSON file.
+
 ## 2026-08-29 11:40 PT — Menagerie vendored via sparse+partial clone, not full clone
 
 `mujoco_menagerie` is only needed locally for the G1 model files (`unitree_g1/`) so the

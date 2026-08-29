@@ -1,0 +1,119 @@
+{
+  "terrain_source": "Everest Base Camp (EBC) trek waypoints, Khumbu region, Nepal",
+  "terrain_version": "2026-08-29",
+  "coordinate_reference_system": "WGS84 (EPSG:4326)",
+  "resolution_m": null,
+  "resolution_note": "Waypoint/route artifact (named-location samples along one trekking route), not a gridded DEM raster -- there is no single grid resolution. Slope is computed between consecutive named waypoints, not from a continuous elevation surface.",
+  "provenance": "Coordinates and published elevations from English Wikipedia articles for each named waypoint, fetched 2026-08-29. See configs/terrain/PROVENANCE.md for per-waypoint source URLs. Distances are great-circle (haversine) between named waypoints, not actual trail distance (the real trail is longer due to switchbacks) -- treat distance_to_safe_waypoint_m as a lower bound / relative-risk signal, not a calibrated hiking distance. Exposure classification is a bounded heuristic proxy defined in scripts/prepare_terrain_artifact.py, not a validated avalanche/exposure model.",
+  "safe_waypoint_names": [
+    "Lukla",
+    "Phakding",
+    "Namche Bazaar"
+  ],
+  "waypoints": [
+    {
+      "name": "Lukla",
+      "latitude": 27.68889,
+      "longitude": 86.73056,
+      "elevation_m": 2860.0,
+      "is_safe_waypoint": true,
+      "route_segment": "seg_00_lukla",
+      "cumulative_distance_m": 0.0,
+      "distance_from_prev_m": 0.0,
+      "slope_deg_from_prev": null,
+      "distance_to_safe_waypoint_m": 0.0,
+      "exposure_class": "LOW"
+    },
+    {
+      "name": "Phakding",
+      "latitude": 27.75,
+      "longitude": 86.717,
+      "elevation_m": 2610.0,
+      "is_safe_waypoint": true,
+      "route_segment": "seg_01_phakding",
+      "cumulative_distance_m": 6925.0,
+      "distance_from_prev_m": 6925.0,
+      "slope_deg_from_prev": -2.07,
+      "distance_to_safe_waypoint_m": 0.0,
+      "exposure_class": "LOW"
+    },
+    {
+      "name": "Namche Bazaar",
+      "latitude": 27.817,
+      "longitude": 86.717,
+      "elevation_m": 3440.0,
+      "is_safe_waypoint": true,
+      "route_segment": "seg_02_namche_bazaar",
+      "cumulative_distance_m": 14375.0,
+      "distance_from_prev_m": 7450.1,
+      "slope_deg_from_prev": 6.36,
+      "distance_to_safe_waypoint_m": 0.0,
+      "exposure_class": "LOW"
+    },
+    {
+      "name": "Tengboche",
+      "latitude": 27.83611,
+      "longitude": 86.76389,
+      "elevation_m": 3860.0,
+      "is_safe_waypoint": false,
+      "route_segment": "seg_03_tengboche",
+      "cumulative_distance_m": 19452.1,
+      "distance_from_prev_m": 5077.1,
+      "slope_deg_from_prev": 4.73,
+      "distance_to_safe_waypoint_m": 5077.1,
+      "exposure_class": "MODERATE"
+    },
+    {
+      "name": "Dingboche",
+      "latitude": 27.883,
+      "longitude": 86.817,
+      "elevation_m": 4410.0,
+      "is_safe_waypoint": false,
+      "route_segment": "seg_04_dingboche",
+      "cumulative_distance_m": 26830.8,
+      "distance_from_prev_m": 7378.7,
+      "slope_deg_from_prev": 4.26,
+      "distance_to_safe_waypoint_m": 12455.8,
+      "exposure_class": "MODERATE"
+    },
+    {
+      "name": "Lobuche",
+      "latitude": 27.94806,
+      "longitude": 86.81028,
+      "elevation_m": 4940.0,
+      "is_safe_waypoint": false,
+      "route_segment": "seg_05_lobuche",
+      "cumulative_distance_m": 34095.2,
+      "distance_from_prev_m": 7264.4,
+      "slope_deg_from_prev": 4.17,
+      "distance_to_safe_waypoint_m": 19720.2,
+      "exposure_class": "MODERATE"
+    },
+    {
+      "name": "Gorak Shep",
+      "latitude": 27.98056,
+      "longitude": 86.82861,
+      "elevation_m": 5164.0,
+      "is_safe_waypoint": false,
+      "route_segment": "seg_06_gorak_shep",
+      "cumulative_distance_m": 38132.6,
+      "distance_from_prev_m": 4037.4,
+      "slope_deg_from_prev": 3.18,
+      "distance_to_safe_waypoint_m": 23757.6,
+      "exposure_class": "MODERATE"
+    },
+    {
+      "name": "Everest Base Camp",
+      "latitude": 28.00722,
+      "longitude": 86.85944,
+      "elevation_m": 5364.0,
+      "is_safe_waypoint": false,
+      "route_segment": "seg_07_everest_base_camp",
+      "cumulative_distance_m": 42369.5,
+      "distance_from_prev_m": 4236.9,
+      "slope_deg_from_prev": 2.7,
+      "distance_to_safe_waypoint_m": 27994.5,
+      "exposure_class": "SEVERE"
+    }
+  ]
+}
