@@ -1,6 +1,5 @@
-import type { ExpeditionDay } from "@/types/expedition";
-
-export const expeditionDays: ExpeditionDay[] = [
+// Legacy fixture retained for reference by the previous composition.
+export const expeditionDays = [
   {
     day: 1,
     camp: "Base Camp",

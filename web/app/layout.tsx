@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "../src/components/ExpeditionExperience.css";
 
 export const metadata: Metadata = {
   title: "Pemba's Field Journal",

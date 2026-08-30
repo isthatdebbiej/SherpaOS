@@ -265,3 +265,10 @@ The design follows the spatial grammar of Robot Everest (front-facing relief, lu
 route, altitude/camp progression) without copying its proprietary assets or source.
 Unity was rejected in favor of web-native SVG/CSS/Motion because the experience needs
 fast browser startup, responsive text, and straightforward deployment from Vultr.
+## 2026-08-30 — Live demo renders runtime evidence, never video labels
+
+The Vultr supervisor publishes each GuardDecision together with its matching
+ActuationReceipt and requested/applied velocities. The browser consumes this
+separate WebSocket stream beside the raw robot stream. It shows NO LIVE EVIDENCE
+when the runtime is absent and has no code path that fabricates GO/CAUTION/NO-GO.
+Navigation order is Live Demo, Radio, Journal.

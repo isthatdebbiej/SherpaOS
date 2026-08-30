@@ -7,10 +7,11 @@ import json
 import os
 from typing import Annotated
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from sherpaos.expedition.storage import ExpeditionStore
+from sherpaos.runtime.live import live_evidence
 from sherpaos.voice.tools import ExpeditionVoiceTools
 
 app = FastAPI(title="SherpaOS Expedition Memory API", version="0.1.0")
@@ -28,6 +29,34 @@ voice_tools = ExpeditionVoiceTools(store)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/supervisor/current")
+def supervisor_current() -> dict[str, object]:
+    if not live_evidence.events:
+        raise HTTPException(status_code=404, detail="no live supervisor evidence")
+    return live_evidence.events[-1]
+
+
+@app.get("/api/supervisor/events")
+def supervisor_events(limit: int = 100) -> list[dict[str, object]]:
+    safe_limit = min(500, max(1, limit))
+    return list(live_evidence.events)[-safe_limit:]
+
+
+@app.websocket("/ws/supervisor")
+async def supervisor_socket(socket: WebSocket) -> None:
+    await socket.accept()
+    queue = live_evidence.subscribe()
+    try:
+        if live_evidence.events:
+            await socket.send_json(live_evidence.events[-1])
+        while True:
+            await socket.send_json(await queue.get())
+    except WebSocketDisconnect:
+        pass
+    finally:
+        live_evidence.unsubscribe(queue)
 
 
 @app.get("/api/expeditions/{expedition_id}/days")

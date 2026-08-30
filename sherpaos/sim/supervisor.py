@@ -10,6 +10,7 @@ from sherpaos.contracts import (
     RobotTelemetry,
 )
 from sherpaos.policy.guards import FiveGuardSupervisor
+from sherpaos.runtime.live import live_evidence
 
 
 class SimulationSupervisorAdapter:
@@ -55,4 +56,12 @@ class SimulationSupervisorAdapter:
         )
         self.decisions.append(decision)
         self.receipts.append(receipt)
+        command = sample.commanded_velocity
+        requested_velocity = float(command[0]) if command is not None else 0.0
+        live_evidence.publish(
+            decision,
+            receipt,
+            requested_velocity_mps=requested_velocity,
+            applied_velocity_mps=requested_velocity * speed_scale,
+        )
         return speed_scale, hold

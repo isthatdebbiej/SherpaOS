@@ -1,32 +1,45 @@
-export type DayStatus = "locked" | "waiting" | "processing" | "complete";
-export type PembaMood = "curious" | "brave" | "tired" | "hopeful" | "proud";
+export type DayMood = "tired" | "brave" | "calm" | "joyful" | "proud";
+export type RobotMotion = "tantrum" | "zombie" | "breathe" | "dance" | "victory";
+export type ContentKind = "fact" | "expressive_reflection";
 
 export type ExpeditionEvent = {
   id: string;
   time: string;
   title: string;
   description: string;
-  kind: "discovery" | "challenge" | "recovery" | "milestone";
+  kind: "challenge" | "recovery" | "milestone" | "observation";
+  evidence: string;
 };
 
 export type DiaryEntry = {
-  title: string;
-  body: string;
+  summary: string;
+  challenge: string;
+  recovery: string;
   proudMoment: string;
   lesson: string;
   tomorrowIntent: string;
 };
 
+export type RobotAssets = {
+  walking?: string;
+  arrival?: string;
+  emotion?: string;
+  poster?: string;
+};
+
 export type ExpeditionDay = {
   day: 1 | 2 | 3 | 4 | 5;
+  date: string;
   camp: string;
   altitude: number;
-  status: DayStatus;
-  sherpaPlan: string[];
-  progress: number;
-  mood?: PembaMood;
   weather: string;
-  diary?: DiaryEntry;
+  reflectionTimestamp: string;
+  timezone: string;
+  mood: DayMood;
+  moodCaption: string;
+  motion: RobotMotion;
+  trailProgress: number;
+  assets: RobotAssets;
+  diary: DiaryEntry;
   events: ExpeditionEvent[];
-  narrationUrl?: string;
 };

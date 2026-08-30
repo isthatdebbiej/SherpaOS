@@ -1,5 +1,13 @@
 "use client";
 
+import { ExpeditionExperience } from "@/components/ExpeditionExperience";
+
+export default function Home() {
+  return <ExpeditionExperience />;
+}
+
+/* Legacy composition retained temporarily for reference.
+
 import { useEffect, useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { expeditionDays } from "@/data/days";
@@ -42,3 +50,4 @@ export default function Home() {
     <footer className="progressFooter"><span>BASE CAMP</span><div><i style={{width:`${((selectedDay.day-1)/4)*100}%`}}/></div><strong>{selectedDay.altitude.toLocaleString()} M</strong><span>SUMMIT · 8,849 M</span></footer>
   </main>;
 }
+*/
