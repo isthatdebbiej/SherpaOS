@@ -14,7 +14,7 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const stream = useRef<MediaStream | null>(null);
-  const pressed = useRef(false);
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function ask(blob: Blob) {
     setBusy(true);
@@ -48,15 +48,10 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
 
   async function begin() {
     if (busy) return;
-    pressed.current = true;
     setFailed(false);
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.current = media;
-      if (!pressed.current) {
-        media.getTracks().forEach((track) => track.stop());
-        return;
-      }
       chunks.current = [];
       const next = new MediaRecorder(media);
       next.ondataavailable = (event) => { if (event.data.size) chunks.current.push(event.data); };
@@ -67,17 +62,23 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
       recorder.current = next;
       next.start();
       setTransmitting(true);
+      stopTimer.current = setTimeout(end, 8000);
     } catch {
-      pressed.current = false;
       setFailed(true);
     }
   }
 
   function end() {
-    pressed.current = false;
+    if (stopTimer.current) clearTimeout(stopTimer.current);
+    stopTimer.current = null;
     setTransmitting(false);
     if (recorder.current?.state === "recording") recorder.current.stop();
     stream.current?.getTracks().forEach((track) => track.stop());
+  }
+
+  function toggleMicrophone() {
+    if (transmitting) end();
+    else void begin();
   }
 
   function replay() {
@@ -93,10 +94,10 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
   const label = busy
     ? "PEMBA IS THINKING…"
     : transmitting
-      ? "RELEASE TO SEND"
+      ? "LISTENING — TAP TO SEND"
       : failed
         ? "RADIO FAILED — PRESS TO RETRY"
-        : "PRESS AND HOLD TO TALK";
+        : "TAP MIC TO TALK";
 
   return <aside className={`${styles.panel} ${embedded ? styles.embedded : ""}`} data-radio-panel={embedded ? "embedded" : undefined} aria-label="Voice-only Radio Pemba">
     <div className={styles.top}><div className={styles.title}><strong>RADIO PEMBA</strong><small>Day 0{initialDay}</small></div><div className={styles.onAir}><i /> ON AIR</div></div>
@@ -107,7 +108,7 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
         <div className={styles.radioRobot}><span className={styles.radioRobotHead}><i/></span><span className={styles.radioRobotBody}/><span className={styles.radioRobotLegs}/><b>PEMBA</b></div>
       </div>
       <div className={`${styles.wave} ${(busy || transmitting || pembaSpeaking) ? styles.active : ""}`} aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/></div>
-      <button className={`${styles.ptt} ${transmitting ? styles.transmitting : ""}`} disabled={busy || pembaSpeaking} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); void begin(); }} onPointerUp={end} onPointerCancel={end}>{label}</button>
+      <button type="button" className={`${styles.ptt} ${transmitting ? styles.transmitting : ""}`} disabled={busy || pembaSpeaking} onClick={toggleMicrophone} aria-pressed={transmitting}><span aria-hidden="true">🎙</span> {label}</button>
       {voiceAudio && !pembaSpeaking && <button type="button" className={styles.ptt} onClick={replay}>PLAY PEMBA VOICE</button>}
     </div>
   </aside>;
