@@ -126,6 +126,16 @@ def test_production_conditions_are_deterministically_diverse() -> None:
     assert _wind_for("combined", 44) == 55.6
 
 
+def test_qualification_spans_full_category_range(matrix_path: Path) -> None:
+    from sherpaos.datasets.generate import episode_specs, load_matrix
+
+    specs = episode_specs(load_matrix(matrix_path), 20)
+    for category in ("nominal", "mobility", "dynamics", "combined"):
+        indices = [row["category_index"] for row in specs if row["category"] == category]
+        assert indices == [0, 16, 27, 38, 49]
+        assert {index % 5 for index in indices} == {0, 1, 2, 3, 4}
+
+
 def test_resumability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_path: Path) -> None:
     calls = 0
 

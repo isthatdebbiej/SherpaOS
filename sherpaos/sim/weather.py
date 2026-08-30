@@ -9,7 +9,7 @@ G1_DRAG_COEFFICIENT = 1.10
 G1_FRONTAL_AREA_M2 = 0.60
 EXTREME_STORM_MPS = 50.0
 EPISODE_STEPS = 500
-HAZARD_ONSET_STEP = 125
+HAZARD_ONSET_STEP = 200
 
 
 def wind_speed_at_step(control_step: int, target_mps: float) -> float:

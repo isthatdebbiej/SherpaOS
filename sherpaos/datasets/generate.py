@@ -78,7 +78,10 @@ def episode_specs(matrix: dict[str, Any], episodes: int) -> list[dict[str, Any]]
     if episodes == 2:
         return [full[0], full[50]]
     if episodes == 20:
-        return [item for start in (0, 50, 100, 150) for item in full[start : start + 5]]
+        qualification_indices = (0, 16, 27, 38, 49)
+        return [
+            full[start + index] for start in (0, 50, 100, 150) for index in qualification_indices
+        ]
     return full
 
 
