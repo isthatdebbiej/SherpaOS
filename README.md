@@ -1,281 +1,232 @@
 # SherpaOS
 
-**An offline, auditable risk supervisor for a Unitree G1 operating beyond easy rescue.**
+SherpaOS is an offline, auditable mobility-risk supervisor for a Unitree G1. It runs above an existing locomotion controller, evaluates onboard-observable telemetry and local route context, and produces one of three bounded decisions:
 
-SherpaOS does not teach a robot to walk. It wraps a frozen open-source locomotion policy, watches onboard-observable telemetry, estimates whether traction or body stability is deteriorating, and combines that evidence with deterministic telemetry, battery, and geographic/environment guards. The result is an inspectable `PASS`, `LIMIT_SPEED`, or `REQUEST_HOLD` decision with reason codes and an actuation receipt.
+- `PASS`: continue with the requested motion;
+- `LIMIT_SPEED`: continue at a reduced velocity;
+- `REQUEST_HOLD`: stop and hold position.
 
-> **Fast thinking keeps the robot safe in the moment. Slow thinking helps the team learn from the journey.**
+SherpaOS does not train or replace the locomotion controller. Its role is to detect deteriorating mobility, unstable body dynamics, unhealthy telemetry, insufficient battery margin, and geographic or environmental risk. Every applied decision is paired with an actuation receipt and stored evidence so the result can be reconstructed later.
 
-Live judge demo: <https://96.30.206.111.nip.io>
+## Why this problem matters
 
-## What judges can see
+A legged robot operating far from immediate recovery may encounter changing traction, body disturbances, actuator degradation, sensor faults, low battery margin, steep terrain, wind, and cold. These conditions are only partially observable from the robot. A safety system must therefore:
 
-The web application has three operator-facing views:
+- operate from measurements available onboard rather than privileged simulator state;
+- react locally without requiring a network or language model;
+- treat missing, stale, malformed, or contradictory data conservatively;
+- prevent one severe risk signal from being averaged away by nominal signals;
+- record the requested response and the response actually applied;
+- expose enough evidence for later diagnosis and operator review.
 
-1. **Live Demo** — a Himalayan G1 visual feed beside real, continuously produced MuJoCo supervisor decisions, five guard reports, requested versus applied velocity, decision IDs, and actuation receipts.
-2. **Radio** — a voice-only HTTPS demonstration. Tap the microphone, speak, and hear Pemba answer from verified journal memory plus the latest supervisor evidence.
-3. **Journal** — four mission-day narratives derived from immutable simulation evidence: nominal, mobility/traction, dynamics/body, and combined stress.
+SherpaOS implements and evaluates this supervisory boundary in MuJoCo. Physical G1 validation remains future work.
 
-The current Live Demo is deliberately described as a hybrid: the robot image is a selected simulation replay, while the decision stream is produced live by a separate continuously running deterministic MuJoCo supervisor. They are not frame-synchronized, and the trained Hugging Face TCN is not yet connected to the displayed episode. Text burned into a video is never accepted as proof that the supervisor acted. A decision is credible only when the API publishes its decision ID, guard evidence, requested action, and matching adapter receipt.
-
-## System architecture
+## System overview
 
 ```text
-Frozen OSS locomotion policy
-(v26 iter42290 ONNX; 12 actions at 50 Hz)
-               |
-               v
-MuJoCo Menagerie G1 + physical terrain + disturbances
-               |
-               +---- evaluator-only truth --------------------+
-               |   friction, contacted slope, slip, fall,     |
-               |   disturbance identity (labels only)          |
-               |                                                v
-               v                                         offline training
-103 onboard-observable motion features                two-head residual TCN
-               |                                                |
-               +---------------- fast safety path <-------------+
-               |
-        five independent guards
-        1. mobility risk
-        2. dynamics/body risk
-        3. telemetry health
-        4. battery margin
-        5. geographic/environment risk
-               |
-       conservative max/action-floor fusion
-               |
-      PASS / LIMIT_SPEED / REQUEST_HOLD
-               |
-        actuation receipt + evidence log
-               |
-               +---------------- slow learning path -----------+
-                    immutable run history, Journal, Radio,
-                    operator review, later ROS-bag ingestion
+Frozen locomotion policy
+        |
+        v
+MuJoCo Menagerie G1 + terrain + disturbances
+        |
+        +---- privileged simulator truth ----> labels and evaluation only
+        |
+        v
+Onboard-observable telemetry at 50 Hz
+        |
+        +---- temporal mobility/dynamics model
+        |
+        +---- deterministic guard reports
+                1. mobility
+                2. dynamics/body
+                3. telemetry health
+                4. battery margin
+                5. geographic/environment
+        |
+        v
+Conservative fusion + hysteresis
+        |
+        v
+PASS / LIMIT_SPEED / REQUEST_HOLD
+        |
+        v
+Applied velocity or hold + actuation receipt + evidence log
+        |
+        +---- Live Demo
+        +---- Journal
+        +---- grounded Radio Q&A
 ```
 
-The LLM and voice system have no path to the joint controller. They explain recorded evidence; they do not create safety truth or authorize motion.
+The fast safety path is local and independent of the web application, voice services, and network connectivity. Journal and Radio consume recorded evidence after or between decisions; they cannot authorize motion or modify a safety decision.
 
-## Fast thinking: the safety loop
+## Runtime inputs
 
-The 50 Hz runtime is intentionally small and inspectable:
+The learned motion-risk model receives a two-second window containing 100 samples at 50 Hz. Each sample contains 103 onboard-observable values:
 
-- **Mobility** looks for loss of traction and slip-like motion.
-- **Dynamics/body** looks for orientation instability, anomalous body motion, and asymmetry.
-- **Telemetry health** rejects malformed, stale, future-dated, duplicated, or incomplete sensor streams.
-- **Battery margin** evaluates charge, cold derating, voltage sag, current, pack temperature, and time margin when those measurements are available.
-- **Geographic/environment** evaluates offline route context, slope, exposure, distance to safety, localization freshness, wind, and temperature.
-
-Fusion is conservative: one severe guard cannot be averaged away by four nominal guards. Hysteresis prevents rapid GO/NO-GO oscillation. Every applied action receives an `ActuationReceipt` tied to the originating `decision_id`.
-
-The learned TCN is not yet the sole authority for actuation. Its validation is promising, but mobility false positives remain too high for an unsupported deployment claim. Deterministic guards and action floors remain the operational safety boundary.
-
-## Slow thinking: mission memory
-
-The slow path exists for review and learning after or between traversals:
-
-- preserve checksummed observations, labels, context, decisions, and receipts;
-- summarize why risk rose, when speed was limited, and what physical outcome followed;
-- ground operator Q&A in stored evidence and the latest live decision;
-- compare cohorts and identify missing coverage before generating more data;
-- eventually ingest immutable G1 ROS 2 bags instead of simulation-only mission memories.
-
-Today, the four Journal days are derived from simulation train/validation evidence. They are not represented as real Himalayan deployments. The repository already accepts immutable `.mcap` and rosbag2 `.db3` uploads, computes SHA-256, inspects topic/message/time coverage without mutating the bag, and rejects privileged-topic leakage. Full physical G1 ingestion and field validation remain future work.
-
-## Models and services
-
-| Role | Model or implementation | What we did | Safety authority |
-|---|---|---|---|
-| Locomotion, primary simulation lane | Zealot G1 v26 `iter42290`, ONNX | Frozen checkpoint, exact 240-input/12-action contract, 50 Hz, pinned SHA-256 | Produces joint targets only |
-| Locomotion fallback/reference | Unitree `unitree_rl_gym` G1 `motion.pt` | Pinned TorchScript policy and matching 12-DOF MuJoCo configuration | Not trained by SherpaOS |
-| Learned risk | SherpaOS two-head residual TCN | Trained on Hugging Face Jobs from 400 simulated episodes | Mobility/dynamics evidence; not sole actuation authority |
-| Speech recognition | `openai/whisper-large-v3` | Called through Hugging Face Inference Providers | None |
-| Grounded Radio answer | `meta-llama/Llama-3.1-8B-Instruct` | Receives only selected journal evidence and latest live decision | None |
-| Speech synthesis | `facebook/mms-tts-eng` | Runs locally on Vultr CPU and returns WAV audio | None |
-
-SherpaOS never trained or fine-tuned locomotion. The only model trained by this project is the compact temporal risk model.
-
-## What the risk model sees
-
-Each training example is a two-second window: **100 control samples at 50 Hz**, each containing **103 onboard-observable values**:
-
-| Feature family | Width |
+| Feature family | Values |
 |---|---:|
-| 29 joint positions | 29 |
-| 29 joint velocities | 29 |
-| 29 joint efforts (zero-filled only when unavailable) | 29 |
-| effort-present flag | 1 |
-| base orientation quaternion | 4 |
-| base angular velocity | 3 |
-| base linear acceleration | 3 |
-| commanded velocity | 3 |
-| command-present and telemetry-valid flags | 2 |
+| Joint positions | 29 |
+| Joint velocities | 29 |
+| Joint efforts | 29 |
+| Effort-present flag | 1 |
+| Base orientation quaternion | 4 |
+| Base angular velocity | 3 |
+| Base linear acceleration | 3 |
+| Commanded velocity | 3 |
+| Command-present and telemetry-valid flags | 2 |
 | **Total** | **103** |
 
-The model predicts two probabilities over the following one-second horizon (50 control samples):
+The deterministic supervisor also consumes context that is intentionally kept outside the motion model:
+
+- battery state of charge, voltage sag, current, pack temperature, and time margin when available;
+- offline route context, slope, exposure, distance to safety, and localization freshness;
+- current and forecast wind and ambient temperature;
+- message timestamps, sequence information, completeness, and validity.
+
+Joint effort is zero-filled only when unavailable, and an explicit flag distinguishes unavailable effort from a measured zero value.
+
+### Privileged data boundary
+
+Simulator-only values are physically separated from observation artifacts. True friction, contacted slope, slip truth, actuator-health truth, disturbance identity, fall truth, and scenario labels may be used to construct labels or evaluate outcomes, but they cannot enter runtime features. Dataset validation rejects privileged fields, non-finite observations, incorrect feature widths, corrupt checksums, duplicate episode IDs, and split overlap.
+
+## Decisions and evidence
+
+Five guard families produce independent reports with risk scores, confidence, and reason codes. Fusion selects the most conservative applicable action floor; a severe guard cannot be cancelled by lower scores from other guards. Hysteresis prevents rapid state changes around a threshold.
+
+The actuation adapter applies the requested velocity limit or hold and returns an `ActuationReceipt` tied to the originating decision ID. Evidence records include:
+
+- the decision and contributing guard reports;
+- telemetry freshness and validity;
+- requested and applied velocity;
+- whether the action was accepted;
+- the acknowledgement source;
+- timestamps, model version, and reason codes.
+
+REST and WebSocket endpoints expose the latest supervisor evidence and recent event history to the Live Demo. The visual robot feed is a selected simulation replay; the live decision stream is produced by a separate continuously running MuJoCo supervisor and is not frame-synchronized with that replay.
+
+## Simulation and dataset generation
+
+The primary simulation lane uses the frozen Zealot G1 v26 `iter42290` ONNX policy with its exact 240-input, 12-action contract at 50 Hz. SherpaOS did not train or fine-tune this locomotion policy. A pinned Unitree `unitree_rl_gym` checkpoint is retained as a fallback and reference path.
+
+Scenarios vary:
+
+- connected collision terrain and physically contacted slope;
+- friction and mixed-traction surfaces;
+- command trajectories;
+- external pushes and body disturbances;
+- actuator degradation;
+- sensor noise and data-quality faults;
+- battery state and environmental context;
+- persistent wind and weather envelopes.
+
+Rendered snow and particles are visual only. Traction comes from collision geometry and friction. Videos are used for qualitative inspection of robot visibility, physical contact, disturbance timing, and label plausibility; video pixels are not model inputs.
+
+The packaged dataset contains two independently generated 200-episode cohorts. Each cohort contains 50 nominal, 50 mobility/traction, 50 dynamics/body, and 50 combined episodes. Episodes are generated deterministically in resumable shards of ten and run for at most 500 control steps unless a physical fall ends the rollout.
+
+The combined 400-episode package is split before windows are loaded:
+
+- 240 training episodes;
+- 80 validation episodes;
+- 80 locked test episodes.
+
+Membership is assigned by scenario group and episode. Overlapping windows from one episode cannot cross splits. Intervention is disabled during training-data generation so unsafe trajectories are not censored by the supervisor that will later learn to detect them.
+
+## Risk-model training
+
+The trained risk estimator is a compact residual temporal convolutional network with a shared encoder and two output heads:
 
 - mobility/traction risk;
 - dynamics/body risk.
 
-Windows advance by 10 samples. Because adjacent windows overlap, splitting individual windows would leak nearly identical motion across train and validation. Membership is therefore immutable and assigned by scenario group/episode before windows are loaded.
+It predicts risk over the next one-second horizon from the preceding two-second observation window. The network uses three causal-style one-dimensional convolution stages with dilations 1, 2, and 4, residual connections, batch normalization, GELU activations, and dropout.
 
-### What the model never sees
+Training uses weighted binary cross entropy, AdamW, deterministic seed `20260830`, gradient clipping, early stopping, and normalization statistics computed from the training split only. Decision thresholds are selected on validation data to minimize false positives while retaining at least 90% recall.
 
-Observation artifacts are physically separated from privileged labels. Validation fails if an observation contains true friction, true/contacted slope, slip truth, actuator health, disturbance identity, fall truth, NaN/Inf, the wrong feature width, duplicated episode IDs, corrupt checksums, missing shards, or split overlap.
-
-Battery, GPS/geographic context, forecast wind, and deterministic guard outputs are stored in separate context artifacts. They are useful to the supervisor and for full-system evaluation, but they do not leak into the 103-feature motion TCN.
-
-## Dataset and simulation method
-
-The production collection contains two independently generated 200-episode cohorts: a higher-slope Himalayan stress cohort and a later 10–15 degree cohort. Each 200-episode cohort contains:
-
-- 50 nominal episodes;
-- 50 mobility/traction episodes;
-- 50 dynamics/body episodes;
-- 50 combined episodes.
-
-Generation is deterministic, controller-only, resumable in shards of 10, and capped at 500 control steps unless a physical fall ends the episode. SherpaOS intervention is disabled during training-data generation so the supervisor cannot censor the unsafe trajectories it must learn to anticipate.
-
-The balanced Hugging Face package contains **400 episodes** with immutable group-level membership:
-
-- 240 train;
-- 80 validation;
-- 80 locked final test.
-
-The final 80-episode test split was not opened during model selection or threshold tuning.
-
-### Physics and environment
-
-The frozen v26 controller drives the full MuJoCo Menagerie G1. Scenarios vary connected collision terrain, contacted slope, friction, command trajectory, pushes/body disturbances, actuator degradation, sensor noise, battery state, route context, and persistent weather envelopes.
-
-Snow rendering is qualitative; traction comes from collision geometry and friction, not pixels. Wind is a time-continuous physical force with a slowly varying envelope rather than implausible frame-to-frame jumps. Current and forecast wind are stored separately. Extreme scenarios include winds near 200 km/h, but only the explicitly configured extreme family uses that envelope.
-
-The v6q terrain qualification uses connected multi-grade surfaces. One qualifying mobility episode physically contacted 10- and 16-degree ice segments before falling. Authored 22- and 30-degree geometry was not contacted and is therefore not claimed as training exposure. The low-slope cohort is capped and qualified separately at 15 degrees.
-
-Video does not train the TCN. It is synchronized qualitative QA used to check robot visibility, terrain contact, disturbance timing, weather rendering, recovery/fall behavior, and label plausibility. Machine-readable telemetry and manifests remain the source of truth.
-
-## The v1–v6 journey
-
-I started this project without a robotics background. The difficult part was not making one dramatic video; it was learning to reject simulations and datasets that looked persuasive but could not support an honest safety claim.
-
-### v1 — a pipeline, not yet a trustworthy experiment
-
-The first milestone established the 200-episode contract, separate observation/label shards, deterministic seeds, checksums, resumability, and group splits. It proved data engineering, but the simple controller and flat-looking scenes did not demonstrate competent locomotion or Himalayan terrain.
-
-**Lesson:** reproducibility is necessary, but reproducibly generating weak data is still weak data.
-
-### v2 — frozen locomotion instead of training the wrong model
-
-We stopped trying to make SherpaOS responsible for locomotion and wrapped a pretrained G1 policy. We evaluated Unitree’s official `motion.pt` path and chose the downloadable v26 ONNX controller for the main terrain lane because its contract was small, stable, and reproducible.
-
-**Lesson:** keep locomotion frozen and spend the project budget on risk supervision.
-
-### v3 — a visible robot is an evidence requirement
-
-Early camera angles cropped arms or hid the robot behind foreground mountains. We moved to the full Menagerie G1 renderer and added segmentation-based gates for minimum robot pixels, body height, and border margin. A render now fails rather than silently publishing an occluded robot.
-
-**Lesson:** a beautiful landscape is useless evidence if the robot’s body response cannot be inspected.
-
-### v4 — visual roughness was not physical terrain
-
-Early snow/ice looked Himalayan but remained too horizontal. We replaced decorative relief with connected collision segments, multi-grade ice/snow/rock profiles, exact contacted-geometry slope truth, low-friction surfaces, and qualification checks requiring the policy to physically reach the intended grade.
-
-**Lesson:** visual slope, route-context slope, and contacted physical slope are three different quantities and must never be conflated.
-
-### v5 — storms had to obey time and physics
-
-Initial extreme-weather experiments risked unrealistic wind changes. We introduced persistent wind envelopes, bounded gust evolution, aerodynamic force, separately recorded current/forecast wind, blowing-snow rendering, and labeled HUD videos. Nominal weather stays nominal; extreme weather is isolated to explicit stress scenarios.
-
-**Lesson:** a “200 km/h” label is not evidence unless the force, telemetry, timing, and visuals agree.
-
-### v6 — causal warning data and honest qualification
-
-We diversified command traces and hazard onset, labeled future risk rather than copying scenario parameters, introduced recovery and failure boundaries, required physical terrain contact, generated a second lower-slope cohort, and audited positive rates. We also found that our first packaged validation split was mostly nominal: its mobility AUROC looked acceptable while mobility false-positive behavior was poor. We did not hide that result. We reindexed only by scenario group—without changing payloads or opening test data—and retrained on balanced hazard coverage.
-
-**Lesson:** high aggregate metrics can be gamed by a bad split; scenario-group isolation and per-cohort metrics matter more than a flattering headline.
-
-## Risk-model training
-
-Training ran as a reproducible Hugging Face Job, not in a Space. The job downloaded the immutable private dataset package, trained, evaluated validation only, and uploaded the model artifacts.
-
-Dataset: `isthatdebbiej/sherpaos-himalayan-risk-400-balanced-v2`
-Model: `iteratehack/sherpaos-risk-tcn-balanced-v2`
-
-The model is a residual temporal convolutional network:
-
-- input shape `100 x 103`;
-- causal-style 1D convolutions with kernel size 5 and dilations 1, 2, and 4;
-- channels 32, 32, and 16;
-- batch normalization, GELU, residual/skip connections, and 0.1 dropout;
-- shared temporal encoder with a two-logit mobility/dynamics head;
-- weighted binary cross entropy from natural training prevalence;
-- AdamW, learning rate 0.001, batch size 128;
-- deterministic seed `20260830`;
-- at most 25 epochs, gradient clipping at 1.0, early stopping patience 4;
-- normalization computed from train only;
-- thresholds selected on validation by minimum false-positive rate while retaining at least 90% recall.
-
-### Validation result
+Current validation results:
 
 | Head | Average precision | AUROC | Brier | Threshold | Recall | False-positive rate | Precision |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Mobility | 0.559 | 0.904 | 0.108 | 0.270 | 0.903 | 0.264 | 0.307 |
 | Dynamics | 0.911 | 0.977 | 0.056 | 0.705 | 0.901 | 0.048 | 0.792 |
 
-These are validation metrics, not field performance. Dynamics is strong for this simulated distribution. Mobility recall is useful, but a 26.4% false-positive rate is too high to make the learned mobility head the sole GO/NO-GO authority. The locked test remains unopened, and sim-to-real transfer is unproven.
+The learned model is not the sole authority for actuation. Deterministic guards and action floors remain active, particularly because the mobility head's validation false-positive rate is still high.
 
-## Radio today and in the field
+- Dataset: `isthatdebbiej/sherpaos-himalayan-risk-400-balanced-v2`
+- Model: `iteratehack/sherpaos-risk-tcn-balanced-v2`
 
-The UI keeps the human metaphor **Radio**, but today it is voice over HTTPS:
+## Operator interfaces
 
-```text
-operator browser microphone
-        -> HTTPS audio upload to Vultr
-        -> Whisper speech-to-text
-        -> evidence retrieval (Journal + latest decision/receipt)
-        -> Llama grounded answer
-        -> local MMS text-to-speech
-        -> HTTPS WAV response to the operator
-```
+The Next.js application contains three views:
 
-There is no claim of RF communication in the current demo.
+- **Live Demo** displays the G1 simulation replay, current five-guard reports, requested and applied velocity, decision IDs, receipts, and recent events.
+- **Journal** presents mission memories derived from immutable simulation evidence and separates factual records from expressive reflection.
+- **Radio** accepts operator speech, retrieves selected Journal evidence and the latest supervisor evidence, and returns a grounded spoken response.
 
-A field deployment can preserve the same evidence contract while changing the transport:
+The deployed Radio pipeline uses `openai/whisper-large-v3` for transcription through Hugging Face Inference Providers, `meta-llama/Llama-3.1-8B-Instruct` for grounded answers, and `facebook/mms-tts-eng` for local speech synthesis. Radio has no connection to the locomotion or safety-control path.
+
+## Repository layout
 
 ```text
-G1 onboard ROS 2
-  joint_states / IMU / commands / battery / localization / diagnostics
-        -> local fast supervisor (must remain safe if disconnected)
-        -> rosbag2/MCAP recorder + signed/checksummed event log
-        -> radio modem, private LTE/5G, Wi-Fi mesh, or satellite IP link
-        -> operator backend on Vultr or an expedition base-station computer
-        -> slow memory/indexing + grounded voice Q&A
+configs/                    scenario, terrain, split, and training contracts
+sherpaos/contracts.py       runtime telemetry and decision types
+sherpaos/sim/               G1 controller, sensors, terrain, weather, and supervisor
+sherpaos/estimator/         deterministic and learned risk features
+sherpaos/policy/            five-guard fusion and hysteresis
+sherpaos/recorder/          incident recording and store-and-forward queue
+sherpaos/evidence/          evidence bundles and manifests
+sherpaos/datasets/          generation, labels, splitting, packaging, validation
+sherpaos/runtime/           live evidence bus, REST/WebSocket, grounded voice API
+sherpaos/expedition/        immutable MCAP/rosbag2 ingestion and inspection
+scripts/                    training, rendering, packaging, and Vultr workflows
+web/                        Next.js operator interface
+tests/                      unit, property, integration, and leakage tests
 ```
 
-The G1 should make immediate safety decisions locally; a network round trip must never be required to stop. When connectivity exists, it uploads compact live decisions and receipts first, then telemetry chunks or complete rosbag files. The backend verifies the bag hash, topic allowlist, timestamps, gaps, and provenance before Pemba can answer questions such as “Why did you stop?” If the link fails, local recording continues and sync resumes later.
+## Installation
 
-A realistic ROS 2 source contract would include joint state, IMU, command, battery state, diagnostic validity/sequence, `sensor_msgs/NavSatFix` or fused localization with covariance, and calibrated local perception. DEM data supports strategic route risk; it cannot identify foot-scale ice or crevasses. Depth/local perception and dynamics remain necessary for nearby traversability.
-
-## Reproduce locally
+Python 3.12 and `uv` are required for the core project. Node.js and npm are required for the web application.
 
 ```bash
 uv sync --extra dev
 uv run sherpa preflight
-uv run sherpa demo --offline
-uv run pytest -q
 ```
 
-Dataset contract run (the only small local generation expected):
+The frozen locomotion checkpoints and terrain artifacts are verified against pinned hashes during their respective setup workflows. See `docs/V26_HIMALAYA_PLAYGROUND.md` for the v26 controller setup.
+
+## Running locally
+
+Run the offline end-to-end demonstration:
+
+```bash
+uv run sherpa demo --offline
+```
+
+Run a scenario:
+
+```bash
+uv run sherpa simulate --scenario nominal --seed 42
+```
+
+Run the test suite and static checks:
+
+```bash
+uv run ruff check .
+uv run pytest
+```
+
+Generate and validate a small dataset-contract sample:
 
 ```bash
 uv run sherpa data generate \
   --matrix configs/scenario_matrix.yaml \
   --episodes 2 \
   --output artifacts/datasets/pilot-contract
-uv run sherpa data validate --dataset artifacts/datasets/pilot-contract
+
+uv run sherpa data validate \
+  --dataset artifacts/datasets/pilot-contract
 ```
 
-Web application:
+Run the web application:
 
 ```bash
 cd web
@@ -283,32 +234,48 @@ npm install
 npm run dev
 ```
 
-Frozen v26 Himalayan renderer and teammate setup are documented in [docs/V26_HIMALAYA_PLAYGROUND.md](docs/V26_HIMALAYA_PLAYGROUND.md). Operational commands are in [docs/RUNBOOK.md](docs/RUNBOOK.md), data requirements in [docs/RISK_DATA_REQUIREMENTS.md](docs/RISK_DATA_REQUIREMENTS.md), and current evidence/limitations in [docs/STATUS.md](docs/STATUS.md).
+Open `http://localhost:3000`.
 
-## Repository map
+Operational commands and deployment steps are documented in `docs/RUNBOOK.md`. Data contracts and acceptance gates are documented in `docs/RISK_DATA_REQUIREMENTS.md` and `docs/CONTRACTS.md`.
 
-```text
-configs/                    dataset, scenario, split, terrain, training contracts
-sherpaos/datasets/          schema, generation, labels, context, split, validation
-sherpaos/sim/               G1 sensors, v26 controller, terrain, weather, supervisor
-sherpaos/policy/            five-guard fusion and hysteresis
-sherpaos/runtime/           live evidence bus, REST/WebSocket, grounded voice API
-sherpaos/expedition/        immutable MCAP/rosbag2 upload and inspection
-scripts/train_risk_model.py reproducible two-head TCN trainer
-scripts/render_v26_himalaya.py labeled, visibility-gated video renderer
-scripts/hf_balanced_job/    Hugging Face Job entrypoint
-web/                        Live Demo, Radio, and four-day operator Journal
-```
+## Deployment
 
-## Honest limitations
+The current deployment target is a Vultr host running:
 
-- This is simulation evidence, not Himalayan ground truth or a safety certification.
-- No physical G1 ROS bag has yet been ingested into the four displayed mission memories.
-- Snow is rigid/non-deformable; visual particles do not create traction physics.
-- The DEM/route artifact is coarse strategic context, not foot-scale terrain perception.
-- The visual feed is a selected, labeled simulation recording; live decisions are generated separately by a continuously running MuJoCo supervisor.
-- The learned risk model has not passed locked-test, hardware, sim-to-real, calibration-drift, latency, or fail-operational qualification.
-- Mobility validation false positives remain too high for sole-authority deployment.
-- Voice and LLM outputs are explanatory only and must never authorize actuation.
+- the continuously running MuJoCo supervisor;
+- the live evidence REST/WebSocket API;
+- the Next.js application;
+- Journal artifacts and voice services;
+- immutable uploaded bag storage and inspection.
 
-SherpaOS is best understood as a rigorous first safety experiment: frozen competent locomotion, leakage-resistant risk data, a conservative real-time supervisor, immutable evidence, and a human interface that can explain what the robot observed and why it slowed or stopped.
+The local safety loop must continue operating if the network, web application, or voice service is unavailable. In a future field deployment, compact decisions and receipts should be transmitted before larger telemetry chunks, while full recording continues locally during communication loss.
+
+## Current status
+
+Implemented and verified:
+
+- frozen G1 locomotion integration and sensorized MuJoCo runtime;
+- five deterministic guard families and conservative fusion;
+- applied speed-limit/hold behavior with matching receipts;
+- leakage-resistant dataset generation, validation, and packaging;
+- 400-episode balanced training package and trained two-head TCN;
+- live evidence REST/WebSocket API;
+- immutable `.mcap` and rosbag2 `.db3` upload and manifest inspection;
+- Live Demo, Journal, and Radio web views;
+- offline CLI demonstration and automated test coverage.
+
+## Unfinished work
+
+- Run and publish the locked 80-episode test evaluation. It has not been used for model selection or threshold tuning.
+- Reduce mobility-head false positives before considering learned mobility risk as a primary authority.
+- Collect and ingest physical G1 ROS 2 bags; current mission memories and model results are simulation-derived.
+- Validate sensor calibration, inference latency, hardware timing, actuator acknowledgement, and fail-operational behavior on a physical G1.
+- Evaluate sim-to-real transfer and recalibrate thresholds using controlled hardware tests.
+- Replace rigid, non-deformable snow with validated terrain/contact models where required.
+- Add foot-scale local terrain perception for ice, holes, and crevasses; the current DEM and route context are coarse.
+- Synchronize the displayed robot stream with the live supervisor decision stream if frame-level visual correspondence is required.
+- Complete decoded common-clock rows, gap/rate/overlap audits, and evidence-linked event intervals for long-duration ROS bag reflection.
+- Connect all Journal views to persisted backend artifacts rather than frontend fixtures.
+- Complete production service management and reverse-proxy configuration for the Vultr deployment.
+
+This repository is a simulation-validated safety-supervision system and evidence pipeline. It is not a field-qualified safety controller or a certification artifact.
