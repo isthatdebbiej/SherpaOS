@@ -15,6 +15,7 @@ build/
 .env
 .env.*
 third_party/mujoco_menagerie/
+third_party/unitree_rl_gym/
 artifacts/demo/*.mp4
 artifacts/playground/
 artifacts/incidents/*.json

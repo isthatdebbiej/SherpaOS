@@ -114,3 +114,22 @@ policy training/fine-tuning, Transformers, VLAs, and end-to-end control are out 
 Simulator observations and privileged labels are stored separately; evaluator truth now
 retains tilt and planted-foot slip magnitude so targets describe physical outcomes rather
 than merely copying scenario parameters.
+
+## 2026-08-29 — Native MuJoCo viewer is an optional local visualization path
+
+`sherpa simulate --viewer` launches MuJoCo's native viewer and synchronizes it to the
+physics timestep, then holds the final frame until the user closes the viewer window. It
+is opt-in so batch simulation, evidence generation, and all runtime decision behavior
+remain headless and deterministic by default. The viewer reads the same model/data
+objects already driven by the existing controller and does not create a new telemetry,
+policy, or ground-truth data path.
+
+## 2026-08-29 — Unitree pretrained walking policy is a separately pinned simulator path
+
+The local `third_party/unitree_rl_gym/` checkout at
+`276801e46c5d433564f24658bac64f254b7d2d4b` supplies the BSD-3-Clause licensed,
+TorchScript `deploy/pre_train/g1/motion.pt` policy and its matching 12-actuator G1
+MuJoCo model. The upstream `deploy_mujoco.py g1.yaml` rollout has been run locally with
+the config's 0.5 m/s forward command. It is not connected to SherpaOS's existing
+29-actuator telemetry/controller path: a new, verified 12-DOF telemetry and actuation
+adapter is required before claims about five-guard supervision of the walking policy.

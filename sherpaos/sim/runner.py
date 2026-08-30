@@ -38,11 +38,13 @@ sensitive.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import mujoco
+import mujoco.viewer
 import numpy as np
 
 from sherpaos.contracts import RobotTelemetry
@@ -111,6 +113,7 @@ def run_episode(
     max_steps: int = DEFAULT_MAX_CONTROL_STEPS,
     dt: float = DEFAULT_CONTROL_DT_S,
     model_path: str | Path | None = None,
+    live_viewer: bool = False,
 ) -> EpisodeResult:
     """Run one G1 episode under `scenario` and return the full trace.
 
@@ -131,6 +134,8 @@ def run_episode(
 
     disturbances.apply_scenario_to_model(model, scenario)
     mujoco.mj_forward(model, data)
+
+    viewer = mujoco.viewer.launch_passive(model, data) if live_viewer else None
 
     controller = PDStepController()
     controller.reset(model)
@@ -159,11 +164,17 @@ def run_episode(
 
         disturbance_active_this_period = False
         for _ in range(substeps):
+            physics_step_started_at = time.perf_counter()
             controller.step(model, data, data.time, speed_scale, hold)
             if disturbances.disturbance_active_at_step(scenario, physics_step_idx):
                 disturbance_active_this_period = True
             disturbances.apply_disturbance_wrench(model, data, scenario, physics_step_idx)
             mujoco.mj_step(model, data)
+            if viewer is not None:
+                viewer.sync()
+                remaining_time = physics_dt - (time.perf_counter() - physics_step_started_at)
+                if remaining_time > 0.0:
+                    time.sleep(remaining_time)
             physics_step_idx += 1
 
         gait_mode = "hold" if (hold or speed_scale <= 0.0) else "stepping"
@@ -213,6 +224,12 @@ def run_episode(
         if pelvis_z < FALL_PELVIS_Z_M or tilt_deg > FALL_TILT_DEG:
             fell = True
             break
+
+    if viewer is not None:
+        while viewer.is_running():
+            viewer.sync()
+            time.sleep(0.05)
+        viewer.close()
 
     return EpisodeResult(
         telemetry=telemetry_history,

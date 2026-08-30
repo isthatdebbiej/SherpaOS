@@ -4,6 +4,7 @@
 |---|---|---|---|
 | MuJoCo (`mujoco` PyPI package) | Physics simulation engine | see `pyproject.toml` pin | Apache-2.0 |
 | google-deepmind/mujoco_menagerie | Unitree G1 MJCF model | `da76818e269b82289eba39808e2fb91d679d6994` (sparse checkout: `unitree_g1/` only, via `--filter=blob:none --sparse`, ~56MB) | Apache-2.0 (per-model license in menagerie repo) |
+| unitreerobotics/unitree_rl_gym | Pretrained 12-DOF G1 MuJoCo walking policy and matching simulator | `276801e46c5d433564f24658bac64f254b7d2d4b`; `deploy/pre_train/g1/motion.pt` SHA-256 `cf668f75b90d1abf73d2b87612a6e76bccc61ff7e083b63582d3f6aaa3c1759d` | BSD-3-Clause |
 | NumPy / SciPy | Numerics | see `pyproject.toml` | BSD-3-Clause |
 | Typer | CLI framework | see `pyproject.toml` | MIT |
 | pytest / pytest-xdist / pytest-cov / Hypothesis | Test harness | see `pyproject.toml` | MIT / MPL-2.0 (Hypothesis) |

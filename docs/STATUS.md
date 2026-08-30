@@ -20,6 +20,9 @@
 - Incident/evidence bundle serialization, including battery fields and all guard reports.
 - Executable CLI: `sherpa preflight`, `sherpa test`, `sherpa simulate`, and
   `sherpa demo --offline`.
+- Optional native live visualization via `sherpa simulate --viewer`.
+- Local Unitree pretrained G1 walking-policy source and checkpoint, pinned with
+  attribution; standalone upstream MuJoCo rollout verified.
 - Checksum-verified nominal and hazard demo smoke run.
 - Isolated, pinned MuJoCo Playground v0.2.0 bootstrap with CUDA JAX GPU gate.
 - Flat- and rough-terrain G1 reset/step smoke checks with non-finite rejection.
@@ -35,6 +38,12 @@
 - `sherpa preflight`: GREEN (G1 asset, terrain artifact, five-guard smoke).
 - `sherpa demo --offline`: GREEN; 300/300 steps survived in nominal and hazard runs;
   299 decisions and 299 receipts per run; evidence checksums verified.
+- `sherpa simulate --viewer --max-steps 2`: GREEN under a mocked native viewer; the
+  CLI forwards the option, synchronizes physics frames, waits for the window to close,
+  and then closes the viewer handle.
+- Unitree `deploy/deploy_mujoco/deploy_mujoco.py g1.yaml`: GREEN after adding the
+  repository root to `PYTHONPATH`; loaded the 12-DOF TorchScript walking policy in the
+  native viewer using its configured 0.5 m/s forward command.
 - Nominal run produced no `REQUEST_HOLD`; it did spend 112/299 decisions in
   `LIMIT_SPEED` after 17 transient dynamics elevations plus policy cooldown. Do not tune
   this away without paired evaluation of nominal-progress impact.
@@ -50,9 +59,9 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 1. Review and commit this integration checkpoint; Vultr validation intentionally refuses
    dirty-tree evidence.
 2. Run `scripts/vultr_playground_smoke.sh` on the provisioned GPU and retrieve its logs.
-3. Obtain or train a compatible, licensed G1 policy, wire its task-specific observation
-   layout to the adapter, and generate a supervised MP4 rollout. Environment smoke alone
-   is not locomotion evidence.
+3. Wire the pinned Unitree 12-DOF policy's observation and action contracts to a
+  dedicated adapter, then generate a five-guard supervised MP4 rollout. The verified
+  standalone viewer run is not yet supervision evidence.
 
 ## Dataset pipeline checkpoint (2026-08-29 PT)
 

@@ -34,6 +34,7 @@ def _run_supervised(
     seed: int,
     max_steps: int,
     waypoint: str,
+    live_viewer: bool = False,
 ) -> tuple[EpisodeResult, SimulationSupervisorAdapter]:
     mission_context = build_mission_context(load_route(), now=0.0, waypoint_name=waypoint)
     adapter = SimulationSupervisorAdapter(mission_context)
@@ -42,6 +43,7 @@ def _run_supervised(
         seed=seed,
         guard_fn=adapter,
         max_steps=max_steps,
+        live_viewer=live_viewer,
     )
     return result, adapter
 
@@ -133,9 +135,12 @@ def simulate(
     max_steps: Annotated[int, typer.Option(min=2)] = 100,
     waypoint: Annotated[str, typer.Option()] = "Lukla",
     output: Annotated[Path, typer.Option()] = Path("artifacts/runs/latest"),
+    viewer: Annotated[
+        bool, typer.Option("--viewer", help="Show the native MuJoCo viewer during the episode.")
+    ] = False,
 ) -> None:
     """Run one offline five-guard MuJoCo episode and write evidence."""
-    result, adapter = _run_supervised(scenario, seed, max_steps, waypoint)
+    result, adapter = _run_supervised(scenario, seed, max_steps, waypoint, live_viewer=viewer)
     summary = _write_run(output, scenario, seed, waypoint, result, adapter)
     typer.echo(json.dumps(summary, indent=2))
     if not summary["evidence_verified"]:
