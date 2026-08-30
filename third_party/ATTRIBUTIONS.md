@@ -15,6 +15,7 @@
 | Three.js / React Three Fiber / Drei | Reserved web-native 3D rendering dependencies for the Field Journal; current terrain is SVG/CSS | `three 0.185.1`, `@react-three/fiber 9.7.0`, `@react-three/drei 10.7.8` | MIT |
 | Howler.js | Reserved narration/ambient audio playback dependency | `2.2.4` | MIT |
 | Zustand | Reserved client expedition-state dependency | `5.0.15` | MIT |
+| Renforce-Dynamics/FSMDeployG1 (fork of ccrpRepo/RoboMimic_Deploy) | G1 dance/skill demo FSM + pretrained ONNX policies (Dance, KungFu, Kick, BeyondMimic) | `18f517b48c3eb7acce1f4c45bbb5db3900b5c2f1` (fetched fresh via `scripts/fetch_fsm_dance_repo.py` into gitignored `third_party/FSMDeployG1/`, not committed) | **None declared upstream** (`license: null` via GitHub API as of pinned commit) — used only as an offline, non-redistributed demo harness; not part of SherpaOS's runtime safety/actuation path, see `docs/DECISIONS.md` |
 
 Update this table whenever a new dependency, pretrained model, or dataset is added, with
 the exact pinned commit/version and license. This file must be accurate before

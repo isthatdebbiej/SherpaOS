@@ -123,3 +123,20 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 - Added its exact 240-input/12-action controller and full Menagerie G1 renderer.
 - Added a segmentation visibility gate so an occluded G1 cannot pass.
 - See docs/V26_HIMALAYA_PLAYGROUND.md for teammate commands.
+
+## FSMDeployG1 dance/skill demo lane (2026-08-30 PT)
+
+- Added `scripts/fetch_fsm_dance_repo.py` (pins and vendors the
+  Renforce-Dynamics/FSMDeployG1 fork into gitignored `third_party/FSMDeployG1/`,
+  patches its FSM to skip unavailable mimic policies) and `scripts/run_g1_dance.py`
+  (fully automated stand -> walk -> trigger skill -> cooldown sequence, no manual
+  keypress timing).
+- Verified per-skill: `kungfu` and `kick` completed cleanly and ended standing in
+  every run tested; `dance` completed cleanly in 2/3 runs and fell once during
+  cooldown (cause not yet root-caused); `beyondmimic` repeatedly falls and is not
+  demo-ready; `kungfu2` has no reachable FSM trigger in this fork and was excluded.
+- This is a separate, non-safety demo lane — SherpaOS does not intervene in it. See
+  docs/G1_DANCE_DEMO.md for full results and docs/DECISIONS.md for the license note
+  (FSMDeployG1 has no declared upstream license; nothing from it is redistributed).
+- Next: re-run `dance` several more times to root-cause the intermittent cooldown
+  fall before relying on it for a live demo.

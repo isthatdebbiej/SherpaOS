@@ -149,3 +149,26 @@ The design follows the spatial grammar of Robot Everest (front-facing relief, lu
 route, altitude/camp progression) without copying its proprietary assets or source.
 Unity was rejected in favor of web-native SVG/CSS/Motion because the experience needs
 fast browser startup, responsive text, and straightforward deployment from Vultr.
+
+## 2026-08-30 — FSMDeployG1 dance/skill demo is a separate, non-safety lane
+
+Added `scripts/fetch_fsm_dance_repo.py` and `scripts/run_g1_dance.py` to run pretrained
+Dance/KungFu/Kick/BeyondMimic ONNX policies on the G1 via a pinned fork of RoboMimic
+Deploy (`Renforce-Dynamics/FSMDeployG1` at `18f517b48c3eb7acce1f4c45bbb5db3900b5c2f1`,
+vendored the same way as `third_party/mujoco_menagerie/`: fetched into a gitignored
+path, not committed). This is a hackathon demo/visualization lane only — SherpaOS does
+not intervene in it, it does not touch the guard/policy/estimator runtime, and it is
+separate from the v26 Himalayan walking-policy lane in
+`docs/V26_HIMALAYA_PLAYGROUND.md`.
+
+FSMDeployG1 reports `license: null` on GitHub as of the pinned commit — no explicit
+license file exists upstream. Given that, nothing from it is redistributed in this
+repository (the fetch script clones it fresh at demo-setup time into a gitignored
+directory) and it is not used anywhere in the runtime safety/actuation decision loop
+per the AGENTS.md safety constraints. See `docs/G1_DANCE_DEMO.md` for verified
+per-skill stability results — `kungfu` and `kick` were the most consistently
+reproducible in this environment; `dance` showed one intermittent fall out of three
+runs (cause not yet root-caused); `beyondmimic` repeatedly falls and is not demo-ready;
+`kungfu2` has a bundled ONNX but no reachable FSM trigger in this fork and was excluded
+rather than mis-wired.
+
