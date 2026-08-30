@@ -24,8 +24,7 @@ def wind_speed_at_step(control_step: int, target_mps: float) -> float:
     target = max(0.0, float(target_mps))
     if target == 0.0:
         return 0.0
-    initial_fraction = 0.25 if target >= EXTREME_STORM_MPS else 0.70
-    initial = initial_fraction * target
+    initial = min(0.70 * target, 8.0)
     phase = min(
         1.0,
         max(0.0, (control_step - HAZARD_ONSET_STEP) / (EPISODE_STEPS - HAZARD_ONSET_STEP - 1)),

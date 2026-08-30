@@ -7,7 +7,7 @@ from sherpaos.sim.weather import HAZARD_ONSET_STEP, wind_speed_at_step
 
 def test_extreme_wind_has_stable_baseline_and_smooth_storm_onset() -> None:
     values = np.asarray([wind_speed_at_step(step, 55.6) for step in range(500)])
-    np.testing.assert_allclose(values[: HAZARD_ONSET_STEP + 1], 13.9, atol=1.7)
+    assert np.max(values[: HAZARD_ONSET_STEP + 1]) < 10.0
     assert values[-1] > 50.0
     assert np.max(np.abs(np.diff(values))) < 0.25
 

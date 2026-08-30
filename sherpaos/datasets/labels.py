@@ -8,7 +8,9 @@ from sherpaos.contracts import RobotTelemetry
 from sherpaos.datasets.schema import OBSERVATION_WIDTH, WindowedRiskDataset, telemetry_vector
 from sherpaos.evaluation.ground_truth import ScenarioGroundTruth
 
-MOBILITY_SLIP_UNSAFE_MPS = 0.8
+# Early-warning threshold: sustained 0.6 m/s planted-foot slip is already
+# operationally hazardous even when the controller subsequently recovers.
+MOBILITY_SLIP_UNSAFE_MPS = 0.6
 DYNAMICS_TILT_UNSAFE_DEG = 25.0
 DYNAMICS_ACTUATOR_HEALTH_UNSAFE = 0.90
 
