@@ -520,6 +520,9 @@ class BatteryMarginGuard:
         provenance = {
             "source": str(telemetry.source.value),
             "battery_fraction": _fmt(fraction),
+            "battery_voltage_v": _fmt(voltage, digits=2),
+            "battery_current_a": _fmt(current_a, digits=2),
+            "battery_temperature_c": _fmt(temperature_c, digits=1),
             "effective_fraction": _fmt(effective_fraction),
             "temperature_retention_factor": _fmt(retention, digits=3),
             "discharge_rate_per_min": _fmt(rate * 60.0 if rate is not None else None, digits=4),

@@ -130,15 +130,18 @@ class MotionGuardSuite:
             )
             return unknown_mobility, unknown_dynamics, failed
 
-    def _reports(
-        self, features: Features, telemetry: RobotTelemetry
-    ) -> tuple[GuardReport, ...]:
+    def _reports(self, features: Features, telemetry: RobotTelemetry) -> tuple[GuardReport, ...]:
         quality_score, quality_confidence, quality_reasons = data_quality_gate(features)
         source = telemetry.source.value
         shared_provenance = {
             "source": source,
             "sample_count": str(features.sample_count),
             "input_age_seconds": f"{features.age_seconds:.6f}",
+            "imu_roll_deg": f"{math.degrees(features.roll):.2f}",
+            "imu_pitch_deg": f"{math.degrees(features.pitch):.2f}",
+            "imu_angular_rate_rad_s": f"{features.angular_velocity_magnitude:.3f}",
+            "joint_velocity_residual": f"{features.joint_velocity_residual:.3f}",
+            "left_right_asymmetry": f"{features.asymmetry_score:.3f}",
         }
 
         mobility_score = slip_component(features)
