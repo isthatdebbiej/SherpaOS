@@ -140,3 +140,14 @@ Git commands in evidence generation now pass the repository as an explicit safe 
   (FSMDeployG1 has no declared upstream license; nothing from it is redistributed).
 - Next: re-run `dance` several more times to root-cause the intermittent cooldown
   fall before relying on it for a live demo.
+
+## v26 interactive keyboard control (2026-08-30 PT)
+
+- Added `scripts/interactive_v26_keyboard.py`: drives the frozen v26 walking
+  policy (docs/V26_HIMALAYA_PLAYGROUND.md) live via mujoco.viewer's
+  key_callback instead of the offline ffmpeg renderer, so the G1 can be
+  walked/turned/strafed interactively with arrow keys/WASD while watching
+  the MuJoCo window. Verified holding standing height (0.74-0.78 m,
+  tilt < ~7 deg) through tens of thousands of control steps and repeated
+  velocity/turn commands. Same pinned v26 ONNX and checksum, no new
+  third-party dependency.
