@@ -100,7 +100,7 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
         : "TAP MIC TO TALK";
 
   return <aside className={`${styles.panel} ${embedded ? styles.embedded : ""}`} data-radio-panel={embedded ? "embedded" : undefined} aria-label="Voice-only Radio Pemba">
-    <div className={styles.top}><div className={styles.title}><strong>PEMBA VOICE DEMO</strong><small>Day 0{initialDay}</small></div><div className={styles.onAir}><i /> HTTPS VOICE</div></div>
+    <div className={styles.top}><div className={styles.title}><strong>RADIO PEMBA</strong><small>Day 0{initialDay}</small></div><div className={styles.onAir}><i /> ON AIR</div></div>
     <div className={styles.simpleBody}>
       <div className={`${styles.companions} ${transmitting ? styles.humanSpeaking : ""} ${pembaSpeaking ? styles.robotSpeaking : ""} ${busy ? styles.thinking : ""}`} aria-live="polite" aria-label={transmitting ? "Operator speaking" : busy ? "Pemba thinking" : pembaSpeaking ? "Pemba speaking" : "Radio ready"}>
         <div className={styles.sherpa}><span className={styles.sherpaHead}><i /></span><span className={styles.sherpaBody}/><b>YOU</b></div>
