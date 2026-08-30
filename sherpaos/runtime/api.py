@@ -1,9 +1,12 @@
 """Read-only public API for live supervisor evidence."""
 
 from __future__ import annotations
+
 import os
+
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+
 from sherpaos.runtime.live import live_evidence
 
 app = FastAPI(title="SherpaOS Live Evidence API", version="0.1.0")
