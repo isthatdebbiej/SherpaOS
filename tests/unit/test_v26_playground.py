@@ -1,13 +1,20 @@
 import numpy as np
 
 from sherpaos.sim.himalaya_scene import scene_xml
-from sherpaos.sim.v26_playground import DEFAULT_POSE, V26ObservationHistory
-from sherpaos.sim.v26_playground import action_target, projected_gravity, robot_visibility
+from sherpaos.sim.v26_playground import (
+    DEFAULT_POSE,
+    V26ObservationHistory,
+    action_target,
+    projected_gravity,
+    robot_visibility,
+)
 
 
 def test_v26_observation_contract_and_reset_history() -> None:
     history = V26ObservationHistory()
-    observation = history.build(DEFAULT_POSE, np.array([1, 0, 0, 0]), np.zeros(3), np.array([0.4, 0, 0, 0]))
+    observation = history.build(
+        DEFAULT_POSE, np.array([1, 0, 0, 0]), np.zeros(3), np.array([0.4, 0, 0, 0])
+    )
     assert observation.shape == (1, 240)
     np.testing.assert_allclose(observation[0, :48], observation[0, -48:])
 

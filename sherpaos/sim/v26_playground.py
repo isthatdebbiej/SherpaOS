@@ -11,18 +11,37 @@ POLICY_FILENAME = "g1_v26_iter42290.onnx"
 POLICY_SHA256 = "1e21412a09f3af7fa2dbdec58de4d4600e2679862a1b24c502c0a02916bd440f"
 POLICY_URL = f"https://huggingface.co/{POLICY_REPOSITORY}/resolve/main/{POLICY_FILENAME}"
 JOINTS = (
-    "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
-    "left_knee_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
-    "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
-    "right_knee_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint",
+    "left_hip_pitch_joint",
+    "left_hip_roll_joint",
+    "left_hip_yaw_joint",
+    "left_knee_joint",
+    "left_ankle_pitch_joint",
+    "left_ankle_roll_joint",
+    "right_hip_pitch_joint",
+    "right_hip_roll_joint",
+    "right_hip_yaw_joint",
+    "right_knee_joint",
+    "right_ankle_pitch_joint",
+    "right_ankle_roll_joint",
 )
 DEFAULT_POSE = np.array([-0.1, 0, 0, 0.3, -0.2, 0] * 2, dtype=np.float32)
-JOINT_LIMITS = np.array([
-    [-2.5307, 2.8798], [-0.5236, 2.9671], [-2.7576, 2.7576],
-    [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
-    [-2.5307, 2.8798], [-2.9671, 0.5236], [-2.7576, 2.7576],
-    [-0.087267, 2.8798], [-0.87267, 0.5236], [-0.2618, 0.2618],
-], dtype=np.float32)
+JOINT_LIMITS = np.array(
+    [
+        [-2.5307, 2.8798],
+        [-0.5236, 2.9671],
+        [-2.7576, 2.7576],
+        [-0.087267, 2.8798],
+        [-0.87267, 0.5236],
+        [-0.2618, 0.2618],
+        [-2.5307, 2.8798],
+        [-2.9671, 0.5236],
+        [-2.7576, 2.7576],
+        [-0.087267, 2.8798],
+        [-0.87267, 0.5236],
+        [-0.2618, 0.2618],
+    ],
+    dtype=np.float32,
+)
 KP = np.array([100, 100, 100, 200, 40, 40] * 2, dtype=np.float64)
 KD = np.array([2.5, 2.5, 2.5, 5, 2, 2] * 2, dtype=np.float64)
 
@@ -30,11 +49,14 @@ KD = np.array([2.5, 2.5, 2.5, 5, 2, 2] * 2, dtype=np.float64)
 def projected_gravity(quaternion: np.ndarray) -> np.ndarray:
     """Return gravity in the base frame for a MuJoCo wxyz quaternion."""
     w, x, y, z = (float(value) for value in quaternion)
-    return np.array([
-        -2 * (x * z - w * y),
-        -2 * (y * z + w * x),
-        -(1 - 2 * (x * x + y * y)),
-    ], dtype=np.float32)
+    return np.array(
+        [
+            -2 * (x * z - w * y),
+            -2 * (y * z + w * x),
+            -(1 - 2 * (x * x + y * y)),
+        ],
+        dtype=np.float32,
+    )
 
 
 class V26ObservationHistory:

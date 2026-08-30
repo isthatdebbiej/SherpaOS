@@ -1,5 +1,7 @@
 """Icy Himalayan qualification scene for the full MuJoCo Menagerie G1."""
 
+# ruff: noqa: E501 -- keep XML elements searchable for terrain review.
+
 from __future__ import annotations
 
 
