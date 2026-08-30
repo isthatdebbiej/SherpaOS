@@ -1,0 +1,29 @@
+version: 1
+approved_topics:
+  /joint_states:
+    role: mobility
+    fields: [position, velocity, effort]
+  /imu/data:
+    role: dynamics
+    fields: [orientation, angular_velocity, linear_acceleration]
+  /battery_state:
+    role: battery
+    fields: [percentage, voltage, current, temperature]
+  /cmd_vel:
+    role: command
+    fields: [linear, angular]
+  /odom:
+    role: localization
+    fields: [pose, twist]
+  /sherpa/guard_decision:
+    role: safety_decision
+    fields: [action, score, confidence, reason_codes]
+  /sherpa/actuation_receipt:
+    role: actuation_evidence
+    fields: [requested_action, applied_action, accepted]
+
+forbidden_name_patterns:
+  - ground_truth
+  - true_friction
+  - injected_fault
+  - true_fall

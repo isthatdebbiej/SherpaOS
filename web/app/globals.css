@@ -1,0 +1,147 @@
+:root {
+  --night: #07111f;
+  --deep: #0b1930;
+  --blue: #4b91ff;
+  --snow: #f5f3ea;
+  --paper: #eadfc7;
+  --gold: #f2b84b;
+  --coral: #e66756;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--night); color: var(--snow); }
+body { font-family: Arial, Helvetica, sans-serif; }
+button { font: inherit; }
+
+.shell { min-height: 100vh; position: relative; overflow: hidden; background: radial-gradient(circle at 67% 14%, #173158 0, transparent 27%), linear-gradient(180deg, #050b16, var(--deep)); }
+.stars { position: absolute; inset: 0; opacity: .55; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 67px 67px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
+.masthead { position: relative; z-index: 10; display: flex; justify-content: space-between; padding: 32px 4vw; }
+.eyebrow { margin: 0 0 8px; color: #9cb7dd; text-transform: uppercase; letter-spacing: .18em; font-size: 11px; font-weight: 700; }
+h1 { margin: 0; font: 400 clamp(32px, 4vw, 66px)/.9 Georgia, serif; letter-spacing: -.035em; }
+.altitude { text-align: right; display: grid; gap: 3px; }
+.altitude strong { font-size: clamp(22px, 3vw, 40px); }
+.altitude span { color: #9cb7dd; text-transform: uppercase; letter-spacing: .14em; font-size: 10px; }
+
+.mountain { --pointer-x: 0; --pointer-y: 0; position: relative; min-height: 630px; isolation: isolate; }
+.aurora { position: absolute; z-index: -1; inset: -20% 15% 25%; background: radial-gradient(ellipse, #3e8ee51c, transparent 67%); filter: blur(18px); transform: translate(calc(var(--pointer-x) * -14px), calc(var(--pointer-y) * -8px)); transition: transform .4s ease-out; }
+.cloud { position: absolute; z-index: 1; width: 220px; height: 38px; border-radius: 50%; background: #b7d3ee0c; filter: blur(11px); pointer-events: none; }
+.cloud::before, .cloud::after { content: ""; position: absolute; border-radius: 50%; background: inherit; }
+.cloud::before { width: 90px; height: 70px; left: 34px; top: -25px; }
+.cloud::after { width: 120px; height: 60px; right: 18px; top: -18px; }
+.cloudOne { left: -15%; top: 26%; animation: cloudDrift 24s linear infinite; }
+.cloudTwo { left: 30%; top: 13%; opacity: .65; animation: cloudDrift 34s linear -13s infinite; }
+.snow { position: absolute; z-index: 10; inset: 0; overflow: hidden; pointer-events: none; }
+.snow i { position: absolute; top: -12px; width: 4px; height: 4px; border-radius: 50%; background: #fff; opacity: .45; animation: snowfall 10s linear infinite; }
+.snow i:nth-child(3n) { width: 2px; height: 2px; animation-duration: 14s; }
+.snow i:nth-child(4n) { width: 6px; height: 6px; filter: blur(1px); animation-duration: 17s; }
+.snow i:nth-child(1) { left: 4%; animation-delay: -1s; } .snow i:nth-child(2) { left: 9%; animation-delay: -7s; } .snow i:nth-child(3) { left: 15%; animation-delay: -4s; } .snow i:nth-child(4) { left: 21%; animation-delay: -12s; } .snow i:nth-child(5) { left: 28%; animation-delay: -3s; } .snow i:nth-child(6) { left: 34%; animation-delay: -9s; } .snow i:nth-child(7) { left: 39%; animation-delay: -5s; } .snow i:nth-child(8) { left: 45%; animation-delay: -15s; } .snow i:nth-child(9) { left: 50%; animation-delay: -2s; } .snow i:nth-child(10) { left: 56%; animation-delay: -11s; } .snow i:nth-child(11) { left: 62%; animation-delay: -6s; } .snow i:nth-child(12) { left: 67%; animation-delay: -13s; } .snow i:nth-child(13) { left: 72%; animation-delay: -8s; } .snow i:nth-child(14) { left: 78%; animation-delay: -4s; } .snow i:nth-child(15) { left: 84%; animation-delay: -10s; } .snow i:nth-child(16) { left: 90%; animation-delay: -6s; } .snow i:nth-child(17) { left: 96%; animation-delay: -14s; } .snow i:nth-child(18) { left: 12%; animation-delay: -16s; } .snow i:nth-child(19) { left: 42%; animation-delay: -18s; } .snow i:nth-child(20) { left: 58%; animation-delay: -17s; } .snow i:nth-child(21) { left: 76%; animation-delay: -19s; } .snow i:nth-child(22) { left: 88%; animation-delay: -20s; }
+.moon { position: absolute; width: 150px; height: 150px; border-radius: 50%; left: 8%; top: 4%; background: #eaf3ff; opacity: .12; filter: blur(1px); box-shadow: 0 0 70px #79aaff; }
+.peak { position: absolute; left: -5%; right: -5%; bottom: -110px; height: 620px; clip-path: polygon(0 100%, 9% 79%, 18% 86%, 30% 61%, 37% 72%, 49% 38%, 57% 58%, 66% 45%, 73% 61%, 82% 31%, 89% 58%, 95% 49%, 100% 73%, 100% 100%); }
+.peakBack { bottom: -35px; background: #17253a; opacity: .7; transform: translate(calc(var(--pointer-x) * -6px), calc(var(--pointer-y) * -3px)) scale(1.08); transition: transform .5s ease-out; }
+.peakFront { background: linear-gradient(128deg, #18263a 0 35%, #354862 35% 47%, #101b2b 47% 78%, #2b3c54 78% 84%, #111c2c 84% 100%); box-shadow: inset 0 50px 90px #6f91b233; transform: translate(calc(var(--pointer-x) * 5px), calc(var(--pointer-y) * 2px)); transition: transform .35s ease-out, filter .5s ease; }
+.lanternOn .peakFront { filter: brightness(1.07); }
+.summitCap { position: absolute; z-index: 2; right: 7.2%; top: 24px; width: 150px; height: 110px; clip-path: polygon(50% 0, 100% 100%, 64% 73%, 52% 84%, 40% 62%, 0 100%); background: linear-gradient(135deg, #dce8f344, #7890ad22 48%, #091321 49%); filter: drop-shadow(0 8px 18px #0008); }
+.terrainRelief { position: absolute; z-index: 0; inset: -40px 0 -70px; width: 100%; height: calc(100% + 110px); filter: contrast(1.08) saturate(.72); transform: translate(calc(var(--pointer-x) * 4px), calc(var(--pointer-y) * 2px)) scale(1.02); transition: transform .45s ease-out; }
+.trail { position: absolute; z-index: 3; inset: 10px 2% auto 2%; width: 96%; height: 540px; overflow: visible; }
+.trail path { fill: none; stroke-linecap: round; }
+.trailShadow { stroke: #02050a88; stroke-width: 15; filter: blur(4px); }
+.trailFuture { stroke: #f1f6fb7d; stroke-width: 3.2; stroke-dasharray: 5 12; animation: routeMarch 18s linear infinite; }
+.trailDone { stroke: #edf6ff; stroke-width: 6; filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 15px var(--blue)); animation: routePulse 2.4s ease-in-out infinite alternate; }
+
+.camps { position: absolute; z-index: 5; inset: 0; }
+.camp { position: absolute; border: 0; background: none; color: white; text-align: left; cursor: pointer; transition: transform .25s ease, opacity .25s ease; }
+.camp:not(:disabled):hover, .camp.selected { transform: translateY(-5px); }
+.camp.selected .campDot { outline: 2px solid #fff8; outline-offset: 7px; }
+.camp:disabled { cursor: default; opacity: .48; }
+.campDot { display: block; width: 14px; height: 14px; margin-bottom: 9px; border: 2px solid white; border-radius: 50%; background: var(--night); box-shadow: 0 0 0 6px #fff1; }
+.camp.complete .campDot { background: var(--gold); border-color: var(--gold); }
+.camp.waiting .campDot { background: var(--blue); border-color: white; box-shadow: 0 0 20px 7px #4b91ff88; }
+.campLabel { display: grid; color: #a6bad7; text-transform: uppercase; letter-spacing: .14em; font-size: 9px; }
+.campLabel strong { color: white; margin-top: 3px; letter-spacing: .05em; font-size: 11px; }
+.camp-1 { left: 49%; top: 492px; }
+.camp-2 { left: 50.5%; top: 388px; }
+.camp-3 { left: 52%; top: 284px; }
+.camp-4 { left: 53.8%; top: 187px; }
+.camp-5 { left: 56.2%; top: 31px; }
+.camp:nth-child(even) .campLabel { transform: translateX(-112%); text-align: right; }
+
+.pemba { position: absolute; z-index: 7; left: calc(50% - 12px); top: 323px; width: 64px; height: 108px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; animation: bob 3s ease-in-out infinite; }
+.pemba:hover .head { transform: rotate(-5deg) translateY(-2px); }
+.pemba:active { animation: pembaBoop .35s ease; }
+.pemba .antenna { position: absolute; left: 31px; top: 0; width: 2px; height: 20px; background: #bdcee6; transform: rotate(8deg); transform-origin: bottom; }
+.pemba .antenna::before { content: ""; position: absolute; left: -4px; top: -5px; width: 9px; height: 9px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 12px var(--coral); }
+.pemba .head { position: absolute; left: 12px; top: 16px; width: 42px; height: 34px; border: 4px solid #d8e0e5; border-radius: 16px 16px 12px 12px; background: #172033; transition: transform .2s ease; }
+.pemba .head i { position: absolute; left: 8px; right: 8px; top: 10px; height: 5px; border-radius: 6px; background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+.pemba .body { position: absolute; left: 14px; top: 51px; width: 39px; height: 41px; border-radius: 9px 9px 14px 14px; background: linear-gradient(90deg, #aab6be, #eef3f3 50%, #84949f); box-shadow: -14px 7px 0 -9px #c8d1d5, 14px 7px 0 -9px #c8d1d5; }
+.pemba .feet { position: absolute; left: 13px; top: 88px; width: 41px; height: 17px; border-bottom: 7px solid #8999a4; border-left: 8px solid transparent; border-right: 8px solid transparent; }
+.thought { position: absolute; right: 52px; top: 20px; width: 172px; padding: 10px 12px; border: 1px solid #ffffff26; border-radius: 14px 14px 3px 14px; background: #07111fd9; color: #c7d7ee; text-align: right; font: italic 13px Georgia, serif; }
+.voiceWaves { position: absolute; left: -27px; top: 22px; display: flex; align-items: center; gap: 3px; height: 26px; }
+.voiceWaves i { display: block; width: 3px; height: 8px; border-radius: 3px; background: var(--blue); animation: wave .7s ease-in-out infinite alternate; }
+.voiceWaves i:nth-child(2) { height: 18px; animation-delay: .15s; }
+.voiceWaves i:nth-child(3) { height: 12px; animation-delay: .3s; }
+.memoryCharms { position: absolute; z-index: 9; right: 92px; top: 49%; display: grid; gap: 11px; }
+.memoryCharms button { width: 38px; height: 38px; border: 1px solid #ffffff25; border-radius: 50%; background: #091527bf; color: #bdd4f3; cursor: pointer; box-shadow: 0 7px 22px #0005; transition: transform .2s ease, background .2s ease, color .2s ease; animation: charmFloat 3s ease-in-out infinite; }
+.memoryCharms button:nth-child(2) { animation-delay: -.8s; }
+.memoryCharms button:nth-child(3) { animation-delay: -1.6s; }
+.memoryCharms button:hover { transform: scale(1.2) rotate(8deg); background: #17325a; color: white; }
+.memoryCharms button.collected { background: var(--gold); color: #352709; border-color: #ffe5a4; animation: memoryPop .5s ease both; }
+.prayerFlags { position: absolute; z-index: 4; left: 47%; bottom: 66px; display: flex; gap: 3px; transform: rotate(-6deg); border-top: 1px solid #e4eaf5aa; }
+.prayerFlags i { display: block; width: 16px; height: 20px; margin-top: -1px; clip-path: polygon(0 0, 100% 0, 75% 100%, 12% 84%); transform-origin: top; animation: flagFlutter 1.4s ease-in-out infinite alternate; }
+.prayerFlags i:nth-child(1) { background: #e66756; } .prayerFlags i:nth-child(2) { background: #f2b84b; animation-delay: -.4s; } .prayerFlags i:nth-child(3) { background: #4b91ff; animation-delay: -.8s; } .prayerFlags i:nth-child(4) { background: #e9e3d2; animation-delay: -.2s; } .prayerFlags i:nth-child(5) { background: #e66756; animation-delay: -.6s; }
+.lanternSwitch { position: absolute; z-index: 12; right: 92px; bottom: 36px; display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid #ffffff22; border-radius: 99px; background: #07111fbb; color: #a9bdd8; cursor: pointer; }
+.lanternSwitch span { color: var(--gold); }
+.lanternOn::after { content: ""; position: absolute; z-index: 2; left: 47%; bottom: 15%; width: 260px; height: 210px; border-radius: 50%; background: radial-gradient(circle, #f4b94b22, transparent 68%); pointer-events: none; animation: lanternGlow 2.7s ease-in-out infinite alternate; }
+.memoryPouch { position: absolute; z-index: 12; right: 92px; bottom: 84px; display: flex; gap: 8px; align-items: baseline; color: #8298b7; text-transform: uppercase; letter-spacing: .12em; font-size: 8px; }
+.memoryPouch strong { color: var(--gold); font-size: 12px; }
+
+.storyCard { position: absolute; z-index: 8; left: 4%; bottom: 42px; width: min(365px, 34vw); min-height: 285px; padding: 25px; border: 1px solid #ffffff24; border-radius: 3px 18px 3px 18px; background: #0a1425ed; backdrop-filter: blur(15px); box-shadow: 0 20px 70px #0008; transform: rotate(.5deg); }
+.storyCard::before { content: ""; position: absolute; width: 80px; height: 20px; top: -11px; left: 40%; background: #e6d6ad55; transform: rotate(-3deg); }
+.storyCard h2 { margin: 0 0 14px; font: 400 30px/1.05 Georgia, serif; }
+.storyCard ul { margin: 0 0 22px; padding-left: 18px; color: #c4d0e0; font-size: 13px; line-height: 1.8; }
+.storyCard button { width: 100%; display: flex; justify-content: space-between; border: 0; border-radius: 99px; padding: 13px 17px; background: var(--blue); color: white; font-weight: 700; cursor: pointer; box-shadow: 0 7px 30px #4b91ff44; }
+.storyCard button.speaking { background: var(--coral); box-shadow: 0 7px 30px #e6675644; }
+.currentPrompt { color: #d2deed; font: italic 15px/1.45 Georgia, serif; }
+.pastDiary { color: #273246; background: linear-gradient(135deg, #f2ead8, #dfd0b1); border-color: #fff9; box-shadow: 0 20px 70px #0009, inset 0 0 40px #9b784526; transform: rotate(-.6deg); }
+.pastDiary .eyebrow { color: #7a6547; }
+.diaryBody { font: italic 15px/1.52 Georgia, serif; }
+.diaryNote { display: grid; gap: 4px; margin: 18px 0; padding-top: 13px; border-top: 1px solid #7a654744; font: 14px/1.4 Georgia, serif; }
+.diaryNote span { color: #8a6740; text-transform: uppercase; letter-spacing: .13em; font: 700 9px Arial, sans-serif; }
+
+.dayRail { position: fixed; z-index: 20; right: 20px; top: 50%; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 12px 0 12px 14px; border-left: 1px solid #ffffff20; background: transparent; transform: translateY(-38%); }
+.dayRail button { display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 8px; min-width: 72px; padding: 7px 8px; border: 1px solid transparent; border-radius: 10px; background: #07111f99; color: #7890b1; font-size: 8px; text-transform: uppercase; letter-spacing: .12em; cursor: pointer; backdrop-filter: blur(7px); }
+.dayRail button:disabled { cursor: default; opacity: .45; }
+.dayRail button.selected { border-color: currentColor; background: #ffffff08; }
+.dayRail i { grid-row: 1 / span 2; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.dayRail small { color: #7385a0; font-size: 8px; letter-spacing: .08em; }
+.dayRail .complete { color: var(--gold); }
+.dayRail .waiting { color: var(--blue); }
+
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } }
+@keyframes wave { from { transform: scaleY(.55); opacity: .6; } to { transform: scaleY(1.25); opacity: 1; } }
+@keyframes snowfall { from { transform: translate3d(0, -20px, 0) rotate(0); } to { transform: translate3d(80px, 690px, 0) rotate(250deg); } }
+@keyframes cloudDrift { from { transform: translateX(-260px); } to { transform: translateX(calc(100vw + 300px)); } }
+@keyframes charmFloat { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+@keyframes memoryPop { 0% { transform: scale(.7); } 55% { transform: scale(1.25) rotate(10deg); } 100% { transform: scale(1); } }
+@keyframes flagFlutter { from { transform: skewX(-6deg) scaleX(.92); } to { transform: skewX(8deg) scaleX(1.05); } }
+@keyframes lanternGlow { from { opacity: .55; transform: scale(.92); } to { opacity: 1; transform: scale(1.08); } }
+@keyframes pembaBoop { 50% { transform: translateY(5px) scale(.94); } }
+@keyframes routeMarch { to { stroke-dashoffset: -160; } }
+@keyframes routePulse { from { opacity: .76; } to { opacity: 1; } }
+
+@media (max-width: 760px) {
+  .masthead { padding: 24px; }
+  .mountain { min-height: 700px; }
+  .storyCard { left: 20px; right: 20px; bottom: 25px; width: auto; }
+  .memoryCharms { left: 14px; top: 30%; }
+  .memoryPouch, .lanternSwitch { display: none; }
+  .campLabel { display: none; }
+  .thought { display: none; }
+  .dayRail { gap: 18px; }
+  .dayRail { position: relative; right: auto; top: auto; flex-direction: row; padding: 14px 20px; border-top: 1px solid #ffffff18; border-left: 0; background: #050b16cc; transform: none; }
+  .dayRail button { padding: 7px; font-size: 0; }
+  .dayRail small { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
