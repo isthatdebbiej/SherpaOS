@@ -6,14 +6,12 @@ import asyncio
 import base64
 import json
 import os
-import subprocess
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
 
 from sherpaos.runtime.live import live_evidence
 
@@ -48,52 +46,21 @@ def events(limit: int = 100) -> list[dict[str, object]]:
     return live_evidence.history(min(500, max(1, limit)))
 
 
-def _robot_mjpeg(source: Path) -> Iterator[bytes]:
-    """Transcode a verified robot recording into a browser-safe MJPEG feed."""
-    command = [
-        "ffmpeg",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-re",
-        "-stream_loop",
-        "-1",
-        "-i",
-        str(source),
-        "-an",
-        "-vf",
-        "fps=10,scale=960:-2",
-        "-q:v",
-        "5",
-        "-f",
-        "mpjpeg",
-        "-boundary_tag",
-        "frame",
-        "pipe:1",
-    ]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    try:
-        if process.stdout is None:
-            return
-        while chunk := process.stdout.read(64 * 1024):
-            yield chunk
-    finally:
-        process.terminate()
-        try:
-            process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            process.kill()
+def _robot_video_source() -> Path:
+    return Path(os.environ.get("SHERPA_ROBOT_STREAM_VIDEO", "artifacts/live/robot.mp4"))
 
 
-@app.get("/stream/robot")
-def robot_stream() -> StreamingResponse:
-    source = Path(os.environ.get("SHERPA_ROBOT_STREAM_VIDEO", "artifacts/live/robot.mp4"))
+@app.get("/stream/robot.mp4")
+def robot_video() -> FileResponse:
+    source = _robot_video_source()
     if not source.is_file():
         raise HTTPException(503, "robot stream source is unavailable")
-    return StreamingResponse(
-        _robot_mjpeg(source),
-        media_type="multipart/x-mixed-replace; boundary=frame",
-        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    return FileResponse(
+        source,
+        media_type="video/mp4",
+        filename="sherpaos-qualified-g1-replay.mp4",
+        headers={"Cache-Control": "no-store"},
+        content_disposition_type="inline",
     )
 
 
