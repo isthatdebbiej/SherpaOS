@@ -14,27 +14,32 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 
+class ResidualBlock(nn.Module):
+    def __init__(self, inputs, outputs, dilation):
+        super().__init__()
+        self.pad = 4 * dilation
+        self.conv = nn.Conv1d(inputs, outputs, 5, padding=self.pad, dilation=dilation)
+        self.norm = nn.BatchNorm1d(outputs)
+        self.skip = nn.Conv1d(inputs, outputs, 1) if inputs != outputs else nn.Identity()
+
+    def forward(self, values):
+        result = self.conv(values)[..., : values.shape[-1]]
+        return nn.functional.gelu(self.norm(result)) + self.skip(values)
+
+
 class TCN(nn.Module):
     def __init__(self, channels):
         super().__init__()
         layers = []
         width = 103
         for i, out in enumerate(channels):
-            layers += [
-                nn.Conv1d(width, out, 5, padding=4 * 2**i, dilation=2**i),
-                nn.GELU(),
-                nn.Dropout(0.1),
-            ]
+            layers += [ResidualBlock(width, out, 2**i), nn.Dropout(0.1)]
             width = out
         self.net = nn.Sequential(*layers)
         self.head = nn.Linear(width, 2)
 
     def forward(self, x):
-        for layer in self.net:
-            x = layer(x)
-            if isinstance(layer, nn.Conv1d):
-                x = x[..., :100]
-        return self.head(x[..., -1])
+        return self.head(self.net(x)[..., -1])
 
 
 def load(root, split):
@@ -78,20 +83,14 @@ def metrics(y, p):
         prec = tp / np.maximum(tp + fp, 1)
         ap = np.sum((rec - np.r_[0, rec[:-1]]) * prec)
         auc = np.trapezoid(np.r_[0, rec, 1], np.r_[0, fp / max(len(t) - t.sum(), 1), 1])
-        best = max(
-            (
-                5
-                * (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(y[:, j] == 1), 1))
-                * (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(p[:, j] >= q), 1))
-                / max(
-                    4 * (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(p[:, j] >= q), 1))
-                    + (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(y[:, j] == 1), 1)),
-                    1e-9,
-                ),
-                q,
-            )
-            for q in np.linspace(0.05, 0.95, 181)
-        )[1]
+        candidates = []
+        for q in np.linspace(0.01, 0.99, 197):
+            predicted = p[:, j] >= q
+            recall = np.sum(predicted & (y[:, j] == 1)) / max(np.sum(y[:, j] == 1), 1)
+            false_positive = np.sum(predicted & (y[:, j] == 0)) / max(np.sum(y[:, j] == 0), 1)
+            if recall >= 0.90:
+                candidates.append((false_positive, -q, q))
+        best = min(candidates)[2] if candidates else 0.01
         out[n] = {
             "average_precision": float(ap),
             "auroc": float(auc),
@@ -102,6 +101,16 @@ def metrics(y, p):
             ),
             "false_positive_rate": float(
                 np.sum((p[:, j] >= best) & (y[:, j] == 0)) / max(np.sum(y[:, j] == 0), 1)
+            ),
+            "precision": float(
+                np.sum((p[:, j] >= best) & (y[:, j] == 1)) / max(np.sum(p[:, j] >= best), 1)
+            ),
+            "threshold_policy": "minimum_fpr_at_recall_gte_0.90",
+            "recall_at_0_5": float(
+                np.sum((p[:, j] >= 0.5) & (y[:, j] == 1)) / max(np.sum(y[:, j] == 1), 1)
+            ),
+            "false_positive_rate_at_0_5": float(
+                np.sum((p[:, j] >= 0.5) & (y[:, j] == 0)) / max(np.sum(y[:, j] == 0), 1)
             ),
         }
     return out
@@ -133,6 +142,7 @@ tl = DataLoader(
     TensorDataset(torch.from_numpy(xt), torch.from_numpy(yt)),
     batch_size=c["batch_size"],
     shuffle=True,
+    generator=torch.Generator().manual_seed(c["seed"]),
 )
 best = 1e9
 state = None
@@ -181,6 +191,8 @@ for n, v in {
         "train_episodes": len(set(it)),
         "validation_episodes": len(set(iv)),
         "history": history,
+        "sampler": "natural_training_distribution",
+        "threshold_policy": "minimum_fpr_at_recall_gte_0.90",
         "test_split_opened": False,
     },
 }.items():
