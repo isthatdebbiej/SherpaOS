@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import styles from "./MemoryRadio.module.css";
 
-const API = process.env.NEXT_PUBLIC_SHERPA_API ?? "http://127.0.0.1:8000";
+const API = "";
 
 export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?: number; embedded?: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -53,16 +53,19 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.current = media;
       chunks.current = [];
-      const next = new MediaRecorder(media);
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+        .find(type => MediaRecorder.isTypeSupported(type));
+      const next = new MediaRecorder(media, mimeType ? { mimeType } : undefined);
       next.ondataavailable = (event) => { if (event.data.size) chunks.current.push(event.data); };
+      next.onerror = () => { setFailed(true); end(); };
       next.onstop = () => {
         const payload = new Blob(chunks.current, { type: next.mimeType || "audio/webm" });
         if (payload.size) void ask(payload);
       };
       recorder.current = next;
-      next.start();
+      next.start(250);
       setTransmitting(true);
-      stopTimer.current = setTimeout(end, 8000);
+      stopTimer.current = setTimeout(end, 4000);
     } catch {
       setFailed(true);
     }
