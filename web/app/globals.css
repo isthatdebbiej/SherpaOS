@@ -1,0 +1,84 @@
+:root {
+  --night: #07111f;
+  --deep: #0b1930;
+  --blue: #4b91ff;
+  --snow: #f5f3ea;
+  --paper: #eadfc7;
+  --gold: #f2b84b;
+  --coral: #e66756;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--night); color: var(--snow); }
+body { font-family: Arial, Helvetica, sans-serif; }
+button { font: inherit; }
+
+.shell { min-height: 100vh; position: relative; overflow: hidden; background: radial-gradient(circle at 67% 14%, #173158 0, transparent 27%), linear-gradient(180deg, #050b16, var(--deep)); }
+.stars { position: absolute; inset: 0; opacity: .55; background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 67px 67px; mask-image: linear-gradient(to bottom, black, transparent 72%); }
+.masthead { position: relative; z-index: 10; display: flex; justify-content: space-between; padding: 32px 4vw; }
+.eyebrow { margin: 0 0 8px; color: #9cb7dd; text-transform: uppercase; letter-spacing: .18em; font-size: 11px; font-weight: 700; }
+h1 { margin: 0; font: 400 clamp(32px, 4vw, 66px)/.9 Georgia, serif; letter-spacing: -.035em; }
+.altitude { text-align: right; display: grid; gap: 3px; }
+.altitude strong { font-size: clamp(22px, 3vw, 40px); }
+.altitude span { color: #9cb7dd; text-transform: uppercase; letter-spacing: .14em; font-size: 10px; }
+
+.mountain { position: relative; min-height: 630px; }
+.moon { position: absolute; width: 180px; height: 180px; border-radius: 50%; right: 13%; top: 3%; background: #eaf3ff; opacity: .16; filter: blur(1px); box-shadow: 0 0 80px #79aaff; }
+.peak { position: absolute; left: -5%; right: -5%; bottom: -110px; height: 620px; clip-path: polygon(0 100%, 8% 76%, 18% 83%, 29% 56%, 36% 70%, 51% 21%, 61% 55%, 70% 34%, 79% 62%, 89% 47%, 100% 75%, 100% 100%); }
+.peakBack { bottom: -35px; background: #17253a; opacity: .7; transform: scale(1.08); }
+.peakFront { background: linear-gradient(125deg, #18263a 0 34%, #31425a 34% 47%, #101b2b 47% 100%); box-shadow: inset 0 50px 90px #6f91b233; }
+.trail { position: absolute; z-index: 3; inset: 10px 2% auto 2%; width: 96%; height: 540px; overflow: visible; }
+.trail path { fill: none; stroke-linecap: round; }
+.trailFuture { stroke: #cfe1fa55; stroke-width: 3; stroke-dasharray: 4 12; }
+.trailDone { stroke: var(--blue); stroke-width: 7; filter: drop-shadow(0 0 10px var(--blue)); }
+
+.camps { position: absolute; z-index: 5; inset: 0; }
+.camp { position: absolute; border: 0; background: none; color: white; text-align: left; cursor: pointer; }
+.camp:disabled { cursor: default; opacity: .48; }
+.campDot { display: block; width: 14px; height: 14px; margin-bottom: 9px; border: 2px solid white; border-radius: 50%; background: var(--night); box-shadow: 0 0 0 6px #fff1; }
+.camp.complete .campDot { background: var(--gold); border-color: var(--gold); }
+.camp.waiting .campDot { background: var(--blue); border-color: white; box-shadow: 0 0 20px 7px #4b91ff88; }
+.campLabel { display: grid; color: #a6bad7; text-transform: uppercase; letter-spacing: .14em; font-size: 9px; }
+.campLabel strong { color: white; margin-top: 3px; letter-spacing: .05em; font-size: 11px; }
+.camp-1 { left: 9%; top: 430px; }
+.camp-2 { left: 34%; top: 295px; }
+.camp-3 { left: 52%; top: 214px; }
+.camp-4 { left: 70%; top: 106px; }
+.camp-5 { left: 87%; top: 25px; }
+
+.pemba { position: absolute; z-index: 7; left: 47%; top: 268px; width: 64px; height: 108px; animation: bob 3s ease-in-out infinite; }
+.pemba .antenna { position: absolute; left: 31px; top: 0; width: 2px; height: 20px; background: #bdcee6; transform: rotate(8deg); transform-origin: bottom; }
+.pemba .antenna::before { content: ""; position: absolute; left: -4px; top: -5px; width: 9px; height: 9px; border-radius: 50%; background: var(--coral); box-shadow: 0 0 12px var(--coral); }
+.pemba .head { position: absolute; left: 12px; top: 16px; width: 42px; height: 34px; border: 4px solid #d8e0e5; border-radius: 16px 16px 12px 12px; background: #172033; }
+.pemba .head i { position: absolute; left: 8px; right: 8px; top: 10px; height: 5px; border-radius: 6px; background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+.pemba .body { position: absolute; left: 14px; top: 51px; width: 39px; height: 41px; border-radius: 9px 9px 14px 14px; background: linear-gradient(90deg, #aab6be, #eef3f3 50%, #84949f); box-shadow: -14px 7px 0 -9px #c8d1d5, 14px 7px 0 -9px #c8d1d5; }
+.pemba .feet { position: absolute; left: 13px; top: 88px; width: 41px; height: 17px; border-bottom: 7px solid #8999a4; border-left: 8px solid transparent; border-right: 8px solid transparent; }
+.thought { position: absolute; left: 56px; top: 20px; width: 178px; padding: 10px 12px; border: 1px solid #ffffff26; border-radius: 14px 14px 14px 3px; background: #07111fd9; color: #c7d7ee; font: italic 13px Georgia, serif; }
+
+.planCard { position: absolute; z-index: 8; right: 5%; bottom: 42px; width: min(340px, 40vw); padding: 25px; border: 1px solid #ffffff24; border-radius: 3px 18px 3px 18px; background: #0a1425dd; backdrop-filter: blur(15px); box-shadow: 0 20px 70px #0008; transform: rotate(.5deg); }
+.planCard::before { content: ""; position: absolute; width: 80px; height: 20px; top: -11px; left: 40%; background: #e6d6ad55; transform: rotate(-3deg); }
+.planCard h2 { margin: 0 0 14px; font: 400 30px Georgia, serif; }
+.planCard ul { margin: 0 0 22px; padding-left: 18px; color: #c4d0e0; font-size: 13px; line-height: 1.8; }
+.planCard button { width: 100%; display: flex; justify-content: space-between; border: 0; border-radius: 99px; padding: 13px 17px; background: var(--blue); color: white; font-weight: 700; cursor: pointer; box-shadow: 0 7px 30px #4b91ff44; }
+
+.dayRail { position: relative; z-index: 12; display: flex; justify-content: center; gap: clamp(16px, 6vw, 88px); padding: 20px; border-top: 1px solid #ffffff18; background: #050b16cc; }
+.dayRail span { display: flex; align-items: center; gap: 8px; color: #7890b1; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; }
+.dayRail i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.dayRail .complete { color: var(--gold); }
+.dayRail .waiting { color: var(--blue); }
+
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-5px) rotate(1deg); } }
+
+@media (max-width: 760px) {
+  .masthead { padding: 24px; }
+  .mountain { min-height: 700px; }
+  .planCard { left: 20px; right: 20px; bottom: 25px; width: auto; }
+  .campLabel { display: none; }
+  .thought { display: none; }
+  .dayRail { gap: 18px; }
+  .dayRail span { font-size: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
