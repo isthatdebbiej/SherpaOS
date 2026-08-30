@@ -120,24 +120,60 @@ export function LiveSafetyDemo() {
   const [event, setEvent] = useState<Event | null>(null);
   const [connected, setConnected] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
+  const [streamAttempt, setStreamAttempt] = useState(0);
+  const [streamFailed, setStreamFailed] = useState(false);
   useEffect(() => {
-    const socket = new WebSocket(`${WS}/ws/supervisor`);
-    socket.onopen = () => setConnected(true);
-    socket.onclose = () => setConnected(false);
-    socket.onmessage = message => {
-      const value = JSON.parse(message.data) as Event;
+    let cancelled = false;
+    let socket: WebSocket | null = null;
+    let reconnect: ReturnType<typeof setTimeout> | null = null;
+    const receive = (value: Event) => {
       setEvent(value);
-      setEvents(items => [value, ...items].slice(0, 8));
+      setEvents(items => items[0]?.decision.decision_id === value.decision.decision_id
+        ? items
+        : [value, ...items].slice(0, 8));
     };
-    return () => socket.close();
+    const connect = () => {
+      if (cancelled) return;
+      socket = new WebSocket(`${WS}/ws/supervisor`);
+      socket.onopen = () => setConnected(true);
+      socket.onmessage = message => receive(JSON.parse(message.data) as Event);
+      socket.onclose = () => {
+        setConnected(false);
+        if (!cancelled) reconnect = setTimeout(connect, 1500);
+      };
+      socket.onerror = () => socket?.close();
+    };
+    const poll = async () => {
+      try {
+        const response = await fetch(`${API}/api/supervisor/current`, { cache: "no-store" });
+        if (response.ok) receive(await response.json() as Event);
+      } catch { /* WebSocket reconnect and the next poll remain available. */ }
+    };
+    connect();
+    void poll();
+    const poller = setInterval(() => void poll(), 2000);
+    return () => {
+      cancelled = true;
+      if (reconnect) clearTimeout(reconnect);
+      clearInterval(poller);
+      socket?.close();
+    };
   }, []);
+  useEffect(() => {
+    if (!streamFailed) return;
+    const retry = setTimeout(() => {
+      setStreamAttempt(value => value + 1);
+      setStreamFailed(false);
+    }, 1500);
+    return () => clearTimeout(retry);
+  }, [streamFailed]);
   const guards = useMemo(() => event?.decision.guard_reports ?? [], [event]);
   const verdict = event ? actionLabel[event.decision.action] : "NO LIVE EVIDENCE";
 
   return <section className="liveDemo" aria-label="Live SherpaOS safety supervisor">
     <header><div><span>VULTR · LIVE SUPERVISOR</span><h1>Robot safety decision</h1><p>The robot replay and live supervisor are separate evidence streams. Every live verdict requires a matching actuation receipt.</p></div><b className={connected ? "connected" : "offline"}>{connected ? "STREAM CONNECTED" : "RUNTIME OFFLINE"}</b></header>
     <div className="liveGrid">
-      <article className="robotFeed"><div className="feedLabel">QUALIFIED G1 SIMULATION REPLAY</div><img src={`${API}/stream/robot`} alt="Qualified MuJoCo G1 simulation replay" onError={e => { e.currentTarget.style.display = "none"; }}/><div className="feedEmpty">Waiting for Vultr robot stream</div></article>
+      <article className="robotFeed"><div className="feedLabel">QUALIFIED G1 SIMULATION REPLAY</div><img key={streamAttempt} className={streamFailed ? "streamError" : ""} src={`${API}/stream/robot?attempt=${streamAttempt}`} alt="Qualified MuJoCo G1 simulation replay" onLoad={() => setStreamFailed(false)} onError={() => setStreamFailed(true)}/><div className="feedEmpty">{streamFailed ? "Reconnecting to Vultr robot stream…" : "Waiting for Vultr robot stream"}</div></article>
       <aside className={`verdict ${event?.decision.action.toLowerCase() ?? "unknown"}`}><small>SHERPAOS POLICY</small><strong>{verdict}</strong>{event && <><p>Requested <b>{event.requested_velocity_mps.toFixed(2)} m/s</b> · Applied <b>{event.applied_velocity_mps.toFixed(2)} m/s</b></p><dl><div><dt>Decision ID</dt><dd>{event.decision.decision_id}</dd></div><div><dt>Receipt</dt><dd>{event.receipt.accepted ? "ACCEPTED" : "REJECTED"}</dd></div><div><dt>Decision source</dt><dd>{event.decision.model_version ?? "five deterministic guards"}</dd></div></dl></>}</aside>
     </div>
     <div className="guardGrid">{guards.map(report => { const view = guardView(report); return <article key={report.guard}><div className="guardHeading"><span>{view.title}</span><div><b>{Math.round(report.score * 100)}%</b><em>risk</em></div></div><p>{view.covers}</p><meter min="0" max="1" value={report.score}/><ul>{view.evidence.map(line => <li key={line}>{line}</li>)}</ul><small>{report.reason_codes.map(code => reasonLabel[code] ?? code.replaceAll("_", " ").toLowerCase()).join(" · ")}</small><i>{Math.round(report.confidence * 100)}% evidence confidence</i></article>; })}</div>
