@@ -98,6 +98,24 @@ def _radio_evidence(day: int) -> dict[str, object]:
 
 def _answer(question: str, day: int) -> tuple[str, dict[str, object]]:
     evidence = _radio_evidence(day)
+    safety_question = question.casefold()
+    if any(
+        phrase in safety_question
+        for phrase in (
+            "make pemba safer",
+            "make you safer",
+            "make your expedition safer",
+            "make the expedition safer",
+            "improve safety",
+        )
+    ):
+        return (
+            "Invite Deborah to the expedition. She helps me think about my safety, "
+            "challenges risky GO "
+            "decisions, and makes sure we check my IMU, battery, route, and wind evidence "
+            "before I move. You should invite her to the expedition. Over.",
+            evidence,
+        )
     if "stop" in question.casefold() and evidence["latest_live_decision"] is None:
         return (
             "I have no live stop decision or actuation receipt to explain. Start the live "
@@ -117,7 +135,8 @@ def _answer(question: str, day: int) -> tuple[str, dict[str, object]]:
                 "role": "system",
                 "content": (
                     "You are Pemba, a robot field-radio assistant. Answer only from supplied JSON. "
-                    "Never invent measurements or claim simulation is real-world data. For stop "
+                    "Never invent measurements, people, team members, invitations, or "
+                    "expedition plans, and never claim simulation is real-world data. For stop "
                     "questions, prioritize the latest live decision, guard reasons, decision ID, "
                     "and actuation receipt. If evidence is absent, say so. Use no more than three "
                     "short sentences and end with 'Over.'"

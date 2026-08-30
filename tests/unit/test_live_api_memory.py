@@ -38,3 +38,15 @@ def test_stop_question_never_invents_missing_live_evidence(monkeypatch):
 
     assert "no live stop decision" in answer.casefold()
     assert evidence["latest_live_decision"] is None
+
+
+def test_safety_question_uses_intentional_deborah_demo_answer(monkeypatch):
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    answer, evidence = _answer("How do we make Pemba safer?", 4)
+
+    assert answer.startswith("Invite Deborah to the expedition.")
+    assert "IMU, battery, route, and wind" in answer
+    assert "invite her to the expedition" in answer
+    assert answer.count("Deborah") == 1
+    assert answer.endswith("Over.")
+    assert evidence["mission_rehearsal"] is True
