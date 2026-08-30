@@ -13,12 +13,15 @@ def test_unitree_walking_publishes_sensorized_telemetry():
 
     samples = []
     auxiliary_samples = []
+    frames = []
     result = run_unitree_walking_episode(
         config_path=DEFAULT_CONFIG_PATH,
         max_steps=3,
         telemetry_observer=samples.append,
+        frame_observer=lambda _model, _data, control_step: frames.append(control_step),
         simulated_auxiliary_observer=auxiliary_samples.append,
         terrain_slope_deg=4.17,
+        scenic_environment=True,
     )
 
     assert result.control_steps == 3
@@ -27,6 +30,7 @@ def test_unitree_walking_publishes_sensorized_telemetry():
     assert result.uphill_slope_deg == pytest.approx(4.17)
     assert len(samples) == 3
     assert len(auxiliary_samples) == 3
+    assert frames == [0, 2]
     assert all(sample.gait_mode == "walking" for sample in samples)
     assert all(sample.joint_position.shape == (12,) for sample in samples)
     assert all(np.all(np.isfinite(sample.base_orientation)) for sample in samples)

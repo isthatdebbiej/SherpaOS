@@ -20,6 +20,7 @@ from sherpaos.geography.terrain import (
     load_route,
     unavailable_mission_context,
 )
+from sherpaos.sim.gestures import DEFAULT_GESTURE_SCHEDULE, gesture_at
 from sherpaos.sim.runner import G1_SCENE_XML_PATH, EpisodeResult, run_episode
 from sherpaos.sim.scenario import mixed_traction_disturbance_scenario, nominal_scenario
 from sherpaos.sim.supervisor import SimulationSupervisorAdapter
@@ -28,6 +29,7 @@ from sherpaos.sim.unitree_walking import (
     SimulatedWalkingAuxiliary,
     run_unitree_walking_episode,
 )
+from sherpaos.sim.walk_video import WalkingVideoRecorder
 from sherpaos.weather import WeatherSnapshot, fetch_open_meteo_current_weather
 from telemetry_feed import TelemetryFeed
 
@@ -229,6 +231,10 @@ def walk(
     telemetry_port: Annotated[
         int | None, typer.Option(min=1, max=65535, help="Serve live telemetry on localhost.")
     ] = 8088,
+    video_output: Annotated[
+        Path | None,
+        typer.Option(help="Record an observer-only 720p MP4 with labelled telemetry context."),
+    ] = None,
     ambient_c: Annotated[
         float | None,
         typer.Option(help="Fallback ambient temperature in degrees C; omit when unavailable."),
@@ -261,6 +267,13 @@ def walk(
             help="Tilt the MuJoCo floor to the selected route's uphill grade.",
         ),
     ] = True,
+    gestures: Annotated[
+        bool,
+        typer.Option(
+            "--gestures/--no-gestures",
+            help="Play a scripted mountaineering hand-signal arm sequence over the walk.",
+        ),
+    ] = False,
 ) -> None:
     """Run the pinned Unitree policy and publish its sensorized telemetry."""
     feed = TelemetryFeed(
@@ -313,18 +326,33 @@ def walk(
         feed.write(telemetry_output)
 
     server = feed.serve(port=telemetry_port) if telemetry_port is not None else None
+    recorder = WalkingVideoRecorder(video_output) if video_output is not None else None
+
+    def capture(model, data, _control_step: int) -> None:
+        if recorder is not None:
+            gesture = None
+            if gestures:
+                _pose, _name, label, level = gesture_at(float(data.time))
+                gesture = (label, level)
+            recorder.capture(model, data, feed.snapshot(), gesture=gesture)
+
     try:
         result = run_unitree_walking_episode(
             config_path=DEFAULT_CONFIG_PATH,
             max_steps=max_steps,
             live_viewer=viewer,
             telemetry_observer=observe,
+            frame_observer=capture if recorder is not None else None,
             simulated_auxiliary_observer=observe_auxiliary if simulate_auxiliary else None,
             simulated_auxiliary_temperature_c=float(observed_ambient_c or 20.0),
             simulated_battery_initial_fraction=initial_battery_fraction,
             terrain_slope_deg=uphill_slope_deg,
+            scenic_environment=video_output is not None,
+            gesture_schedule=DEFAULT_GESTURE_SCHEDULE if gestures else None,
         )
     finally:
+        if recorder is not None:
+            recorder.close()
         if server is not None:
             server.shutdown()
             server.server_close()
@@ -338,6 +366,7 @@ def walk(
                 "fell": result.fell,
                 "uphill_slope_deg": result.uphill_slope_deg,
                 "telemetry_snapshot": str(telemetry_output.resolve()),
+                "video": None if video_output is None else str(video_output.resolve()),
             },
             indent=2,
         )

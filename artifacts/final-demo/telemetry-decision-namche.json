@@ -1,0 +1,133 @@
+{
+ "schema": "1.0",
+ "ready": true,
+ "t": 20.0,
+ "window_s": 1.0,
+ "samples": 50,
+ "orientation": {
+  "roll_deg": 1.3729,
+  "pitch_deg": -2.0906,
+  "yaw_deg": -15.6375,
+  "tilt_deg": 2.5011,
+  "tilt_max_deg": 4.0966,
+  "quaternion_wxyz": [
+   0.9905,
+   0.0094,
+   -0.0197,
+   -0.1358
+  ]
+ },
+ "motion": {
+  "gyro_rms_rad_s": 0.3043,
+  "accel_rms_m_s2": 9.6608,
+  "accel_z_var": 5.001,
+  "cmd_vel_m_s": 0.5
+ },
+ "gait": {
+  "cadence_hz": 1.25,
+  "left_contact": false,
+  "right_contact": true,
+  "single_support_frac": 0.92,
+  "foot_load_left_n": 0.0,
+  "foot_load_right_n": 255.7636,
+  "source": "simulated:mujoco_contact_force"
+ },
+ "power": {
+  "mechanical_w": 41.096,
+  "mechanical_mean_w": 34.0523,
+  "electrical_w": 236.5977,
+  "electrical_mean_w": 212.249,
+  "electrical_source": "simulated:walking_pack_model",
+  "energy_wh_cumulative": 1.2259
+ },
+ "battery": {
+  "gauge": {
+   "source": "simulated:walking_pack_model",
+   "fraction": 0.9975,
+   "voltage_v": 53.7415,
+   "current_a": 4.3846,
+   "temperature_c": 8.8
+  },
+  "range_model": {
+   "available": true,
+   "source": "modelled:joint-work-plus-idle-load",
+   "speed_basis": "commanded_velocity",
+   "speed_assumption_m_s": 0.5,
+   "initial_charge_fraction": 1.0,
+   "state_of_charge_fraction": 0.9973,
+   "nominal_capacity_wh": 500.0,
+   "cold_capacity_fraction": 0.9292,
+   "usable_capacity_wh": 464.6,
+   "remaining_energy_wh": 463.3641,
+   "energy_used_wh": 1.2359,
+   "estimated_electrical_w": 236.9868,
+   "estimated_electrical_mean_w": 218.54,
+   "estimated_range_remaining_m": 3816.489,
+   "estimated_endurance_s": 7632.978
+  }
+ },
+ "decision_context": {
+  "telemetry_valid": true,
+  "stability": {
+   "current_tilt_deg": 2.5011,
+   "peak_tilt_window_deg": 4.0966
+  },
+  "locomotion": {
+   "commanded_speed_m_s": 0.5,
+   "actual_speed_m_s": 0.4965,
+   "speed_tracking_ratio": 0.9931,
+   "gait_evidence_available": true
+  },
+  "energy": {
+   "range_model_available": true,
+   "raw_gauge_available": true,
+   "validated_electrical_power_available": true
+  },
+  "data_gaps": [],
+  "simulation_only_fields": [
+   "actual_base_speed_m_s",
+   "foot_contact_and_load",
+   "raw_battery_gauge",
+   "validated_electrical_power"
+  ]
+ },
+ "joints": {
+  "count": 12,
+  "peak_torque_nm": 30.3228,
+  "peak_torque_joint": "joint_4",
+  "mean_abs_torque_nm": 6.3912
+ },
+ "environment": {
+  "ambient_c": 8.8,
+  "terrain_simulation": {
+   "uphill_slope_deg": 6.36,
+   "source": "simulated:mujoco_rotated_floor"
+  },
+  "himalaya": {
+   "available": true,
+   "waypoint": "Namche Bazaar",
+   "latitude_deg": 27.817,
+   "longitude_deg": 86.717,
+   "elevation_m": 3440.0,
+   "slope_deg": 6.36,
+   "distance_to_safe_waypoint_m": 0.0,
+   "exposure_class": "LOW",
+   "route_segment": "seg_02_namche_bazaar",
+   "terrain_source": "Everest Base Camp (EBC) trek waypoints, Khumbu region, Nepal",
+   "terrain_version": "2026-08-29",
+   "provenance": "Coordinates and published elevations from English Wikipedia articles for each named waypoint, fetched 2026-08-29. See configs/terrain/PROVENANCE.md for per-waypoint source URLs. Distances are great-circle (haversine) between named waypoints, not actual trail distance (the real trail is longer due to switchbacks) -- treat distance_to_safe_waypoint_m as a lower bound / relative-risk signal, not a calibrated hiking distance. Exposure classification is a bounded heuristic proxy defined in scripts/prepare_terrain_artifact.py, not a validated avalanche/exposure model. [waypoint 'Namche Bazaar']"
+  },
+  "weather": {
+   "available": true,
+   "source": "Open-Meteo",
+   "observed_at": "2026-08-30T23:30",
+   "fetched_at_utc": "2026-08-30T17:45:17.725224+00:00",
+   "temperature_c": 8.8,
+   "apparent_temperature_c": 8.0,
+   "relative_humidity_pct": 100.0,
+   "wind_speed_kmh": 2.8,
+   "model_elevation_m": 3781.0,
+   "error": null
+  }
+ }
+}

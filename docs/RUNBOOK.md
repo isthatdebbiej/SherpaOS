@@ -43,6 +43,19 @@ uv run sherpa demo --offline
 `simulate --max-steps` counts 50 Hz control ticks, not 500 Hz physics steps:
 `--max-steps 300` is 6 seconds and the default `1,500` is 30 seconds.
 
+To record a 15-second, 720p Unitree walking demonstration with its labelled telemetry HUD:
+
+```bash
+uv run sherpa walk --headless --max-steps 750 --waypoint Lobuche --ambient-c 2 \
+  --weather --simulate-auxiliary --uphill --telemetry-output \
+  artifacts/final-demo/sherpaos-lobuche-telemetry.json --video-output \
+  artifacts/final-demo/sherpaos-lobuche-uphill-telemetry.mp4
+```
+
+The MP4 HUD is an observer of the same `TelemetryFeed` snapshot written beside it. Foot
+contacts, actual speed, pack state, and electrical power are explicitly simulated display
+values and do not enter the guard or locomotion policy.
+
 ```bash
 uv run ruff check .
 uv run pytest -m "not integration"

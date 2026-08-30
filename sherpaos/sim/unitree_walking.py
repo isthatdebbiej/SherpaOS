@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import mujoco
 import mujoco.viewer
@@ -21,11 +22,36 @@ import yaml
 
 from sherpaos.contracts import RobotTelemetry
 from sherpaos.sim.g1_sensors import build_sensorized_scene
+from sherpaos.sim.gestures import GestureCue, gesture_at
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = _REPO_ROOT / "configs" / "unitree" / "g1_walking.yaml"
 
 TelemetryObserver = Callable[[RobotTelemetry], None]
+FrameObserver = Callable[[mujoco.MjModel, mujoco.MjData, int], None]
+
+# Optional arm articulation. The pinned policy only drives the 12 leg joints;
+# when enabled we swap in the 23-DOF description (same legs, plus waist/arms)
+# and hold the extra joints with a small fixed PD toward a battery-dependent
+# pose -- neutral (matches the frozen 12-DOF arm mesh) when charged, lowered
+# when low on charge, both as an energy-saving posture and a visual signal.
+# Order: waist_yaw, then left/right shoulder_pitch/roll/yaw, elbow, wrist_roll.
+_ARM_NEUTRAL_ANGLES = np.zeros(11, dtype=np.float32)
+_ARM_LOWERED_ANGLES = np.array(
+    [0.0, 1.55, 0.35, 0.0, 0.55, 0.0, 1.55, -0.35, 0.0, 0.55, 0.0],
+    dtype=np.float32,
+)
+_ARM_KP = 45.0
+_ARM_KD = 2.0
+_ARM_LOWER_BATTERY_HIGH = 0.35
+_ARM_LOWER_BATTERY_LOW = 0.15
+
+
+def _arm_target_angles(battery_fraction: float) -> np.ndarray:
+    span = _ARM_LOWER_BATTERY_HIGH - _ARM_LOWER_BATTERY_LOW
+    weight = (_ARM_LOWER_BATTERY_HIGH - battery_fraction) / span
+    weight = float(np.clip(weight, 0.0, 1.0))
+    return _ARM_NEUTRAL_ANGLES + weight * (_ARM_LOWERED_ANGLES - _ARM_NEUTRAL_ANGLES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,10 +107,15 @@ def run_unitree_walking_episode(
     max_steps: int | None = None,
     live_viewer: bool = False,
     telemetry_observer: TelemetryObserver | None = None,
+    frame_observer: FrameObserver | None = None,
+    frame_stride_controls: int = 2,
     simulated_auxiliary_observer: AuxiliaryObserver | None = None,
     simulated_auxiliary_temperature_c: float = 20.0,
     simulated_battery_initial_fraction: float = 1.0,
     terrain_slope_deg: float = 0.0,
+    scenic_environment: bool = False,
+    arms_enabled: bool = False,
+    gesture_schedule: tuple[GestureCue, ...] | None = None,
 ) -> UnitreeWalkingResult:
     """Run the pinned Unitree policy and publish one sample per control tick."""
     config = _load_config(config_path)
@@ -94,7 +125,8 @@ def run_unitree_walking_episode(
     if _sha256(policy_path) != expected_hash:
         raise ValueError("Unitree policy hash does not match configs/unitree/g1_walking.yaml")
 
-    scene = build_sensorized_scene(source_xml)
+    arms_enabled = arms_enabled or gesture_schedule is not None
+    scene = _build_scene(source_xml, scenic_environment, arms_enabled)
     model, data = scene.model, scene.data
     model.opt.timestep = float(config["simulation_dt_s"])
     _set_uphill_terrain(model, data, terrain_slope_deg)
@@ -111,18 +143,27 @@ def run_unitree_walking_episode(
     control_steps = int(config["default_max_control_steps"] if max_steps is None else max_steps)
     if control_steps < 1:
         raise ValueError("max_steps must be positive")
+    if frame_stride_controls < 1:
+        raise ValueError("frame_stride_controls must be positive")
 
     start_xy = data.qpos[:2].copy()
     foot_geom_ids = _foot_geom_ids(model)
     battery = _SimulatedBattery(
         simulated_battery_initial_fraction, simulated_auxiliary_temperature_c
     )
+    target_arm_position = _ARM_NEUTRAL_ANGLES.copy()
     viewer = mujoco.viewer.launch_passive(model, data) if live_viewer else None
     try:
         for physics_step in range(control_steps * control_decimation):
             wall_started_at = time.perf_counter()
-            torque = (target_dof_position - data.qpos[7:]) * kps - data.qvel[6:] * kds
-            data.ctrl[:] = torque
+            torque = (target_dof_position - data.qpos[7:19]) * kps - data.qvel[6:18] * kds
+            data.ctrl[:12] = torque
+            if arms_enabled:
+                arm_torque = (
+                    (target_arm_position - data.qpos[19:30]) * _ARM_KP
+                    - data.qvel[18:29] * _ARM_KD
+                )
+                data.ctrl[12:23] = arm_torque
             mujoco.mj_step(model, data)
 
             if viewer is not None:
@@ -153,22 +194,37 @@ def run_unitree_walking_episode(
                 commanded_velocity=command,
                 gait_mode="walking",
             )
-            if simulated_auxiliary_observer is not None:
+            if simulated_auxiliary_observer is not None or arms_enabled:
+                auxiliary = None
                 try:
-                    simulated_auxiliary_observer(
-                        _simulated_auxiliary(
-                            model,
-                            data,
-                            foot_geom_ids,
-                            battery,
-                            simulated_auxiliary_temperature_c,
-                        )
+                    auxiliary = _simulated_auxiliary(
+                        model,
+                        data,
+                        foot_geom_ids,
+                        battery,
+                        simulated_auxiliary_temperature_c,
                     )
                 except Exception:
                     pass
+                if auxiliary is not None and simulated_auxiliary_observer is not None:
+                    try:
+                        simulated_auxiliary_observer(auxiliary)
+                    except Exception:
+                        pass
+                if auxiliary is not None and arms_enabled and gesture_schedule is None:
+                    target_arm_position = _arm_target_angles(auxiliary.battery_fraction)
+            if gesture_schedule is not None:
+                target_arm_position, _name, _label, _level = gesture_at(
+                    float(data.time), gesture_schedule
+                )
             if telemetry_observer is not None:
                 try:
                     telemetry_observer(sample)
+                except Exception:
+                    pass
+            if frame_observer is not None and control_step % frame_stride_controls == 0:
+                try:
+                    frame_observer(model, data, control_step)
                 except Exception:
                     pass
 
@@ -215,6 +271,51 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _build_scene(source_xml: Path, scenic_environment: bool, arms_enabled: bool = False):
+    """Build the walking scene, optionally swapping in the 23-DOF (arms) description.
+
+    ``g1_23dof.xml`` bundles its own floor/skybox/lighting (unlike ``g1_12dof.xml``,
+    which relies on ``scene.xml`` for those), so the arm-enabled path reads it
+    directly instead of routing through ``scene.xml`` -- combining both would
+    declare the "groundplane" texture/material twice and fail to compile.
+    """
+    if not scenic_environment and not arms_enabled:
+        return build_sensorized_scene(source_xml)
+    base_path = source_xml.parent / "g1_23dof.xml" if arms_enabled else source_xml
+    scene = base_path.read_text(encoding="utf-8")
+    if scenic_environment:
+        scene = scene.replace(
+            '<texture type="skybox" builtin="flat" rgb1="0 0 0" rgb2="0 0 0" '
+            'width="512" height="3072"/>',
+            '<texture type="skybox" builtin="gradient" rgb1="0.55 0.72 0.88" '
+            'rgb2="0.04 0.10 0.19" width="512" height="3072"/>',
+        ).replace(
+            'rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"',
+            'rgb1="0.84 0.90 0.95" rgb2="0.60 0.72 0.82"',
+        )
+        himalaya_lights = (
+            '<light directional="true" pos="-4 -5 9" dir="0.35 0.25 -1" diffuse="1 0.94 0.84"/>\n'
+            '    <light directional="true" pos="4 3 6" dir="-0.5 -0.25 -1" '
+            'diffuse="0.32 0.48 0.72"/>'
+        )
+        if arms_enabled:
+            scene = scene.replace(
+                '<light pos="1 0 3.5" dir="0 0 -1" directional="true"/>',
+                f'{himalaya_lights}\n    <light pos="1 0 3.5" dir="0 0 -1" directional="true"/>',
+            )
+        else:
+            scene = scene.replace("  <worldbody>", f"  <worldbody>\n    {himalaya_lights}")
+    with NamedTemporaryFile(
+        mode="w", suffix=".xml", prefix=".sherpa_himalaya_", dir=base_path.parent, delete=False
+    ) as temporary:
+        temporary.write(scene)
+        temporary_path = Path(temporary.name)
+    try:
+        return build_sensorized_scene(temporary_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
 def _policy_observation(
     *,
     data: mujoco.MjData,
@@ -224,8 +325,8 @@ def _policy_observation(
     time_s: float,
     config: dict,
 ) -> np.ndarray:
-    qj = (data.qpos[7:] - default_angles) * float(config["dof_pos_scale"])
-    dqj = data.qvel[6:] * float(config["dof_vel_scale"])
+    qj = (data.qpos[7:19] - default_angles) * float(config["dof_pos_scale"])
+    dqj = data.qvel[6:18] * float(config["dof_vel_scale"])
     quaternion = data.qpos[3:7]
     gravity_orientation = np.array(
         [

@@ -61,6 +61,9 @@
 - `sherpa walk --uphill` physically rotates the MuJoCo floor to the selected
   Himalayan route grade and publishes that simulated incline in telemetry;
   a five-second $4.17$ degree Lobuche run covered 2.23 m without falling.
+- `sherpa walk --video-output <path>` records a 1280x720, 25 FPS H.264
+  observer-only walking video with a labelled telemetry HUD; the matching
+  telemetry snapshot remains the machine-readable source of truth.
 - Checksum-verified nominal and hazard demo smoke run.
 - Isolated, pinned MuJoCo Playground v0.2.0 bootstrap with CUDA JAX GPU gate.
 - Flat- and rough-terrain G1 reset/step smoke checks with non-finite rejection.

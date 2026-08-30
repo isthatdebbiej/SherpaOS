@@ -1,0 +1,11 @@
+[telemetry] http://127.0.0.1:8099/telemetry  and  /llm
+{
+  "controller": "unitree-g1-motion.pt",
+  "control_steps": 750,
+  "elapsed_seconds": 15.000000000001679,
+  "planar_distance_m": 6.969532676219524,
+  "fell": false,
+  "uphill_slope_deg": 4.17,
+  "telemetry_snapshot": "C:\\Users\\bakho\\OneDrive\\himalya\\SherpaOS\\artifacts\\final-demo\\sherpaos-lobuche-telemetry.json",
+  "video": "C:\\Users\\bakho\\OneDrive\\himalya\\SherpaOS\\artifacts\\final-demo\\sherpaos-lobuche-uphill-telemetry.mp4"
+}
