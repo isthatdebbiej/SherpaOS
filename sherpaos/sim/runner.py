@@ -52,7 +52,7 @@ from sherpaos.evaluation.ground_truth import ScenarioGroundTruth, classify_unsaf
 from sherpaos.sim import disturbances
 from sherpaos.sim.battery import enrich_battery_telemetry
 from sherpaos.sim.controller import STAND_KEYFRAME_NAME, PDStepController
-from sherpaos.sim.mujoco_source import MuJoCoTelemetrySource
+from sherpaos.sim.g1_sensors import build_sensorized_scene
 from sherpaos.sim.scenario import Scenario
 
 # ---------------------------------------------------------------------------
@@ -77,6 +77,7 @@ FLOOR_GEOM_NAME = "floor"
 # episode only), return (speed_scale in [0, 1], hold). See
 # sherpaos/sim/controller.py for what these mean physically.
 GuardFn = Callable[[list[RobotTelemetry]], tuple[float, bool]]
+TelemetryObserver = Callable[[RobotTelemetry], None]
 
 
 def _default_guard_fn(_history: list[RobotTelemetry]) -> tuple[float, bool]:
@@ -114,6 +115,7 @@ def run_episode(
     dt: float = DEFAULT_CONTROL_DT_S,
     model_path: str | Path | None = None,
     live_viewer: bool = False,
+    telemetry_observer: TelemetryObserver | None = None,
 ) -> EpisodeResult:
     """Run one G1 episode under `scenario` and return the full trace.
 
@@ -125,8 +127,9 @@ def run_episode(
     guard = guard_fn if guard_fn is not None else _default_guard_fn
     xml_path = str(model_path) if model_path is not None else str(G1_SCENE_XML_PATH)
 
-    model = mujoco.MjModel.from_xml_path(xml_path)
-    data = mujoco.MjData(model)
+    sensorized_scene = build_sensorized_scene(xml_path)
+    model = sensorized_scene.model
+    data = sensorized_scene.data
     key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, STAND_KEYFRAME_NAME)
     if key_id < 0:
         raise ValueError(f"model has no '{STAND_KEYFRAME_NAME}' keyframe")
@@ -139,7 +142,6 @@ def run_episode(
 
     controller = PDStepController()
     controller.reset(model)
-    telemetry_source = MuJoCoTelemetrySource()
     noise_rng = np.random.default_rng(seed)
 
     physics_dt = float(model.opt.timestep)
@@ -178,12 +180,10 @@ def run_episode(
             physics_step_idx += 1
 
         gait_mode = "hold" if (hold or speed_scale <= 0.0) else "stepping"
-        sample = telemetry_source.sample(
-            model,
-            data,
+        sample = sensorized_scene.suite.low_state(
             sequence=control_step,
             monotonic_time=data.time,
-            speed_scale=speed_scale,
+            commanded_velocity=np.array([speed_scale], dtype=float),
             gait_mode=gait_mode,
         )
         sample = enrich_battery_telemetry(
@@ -195,6 +195,13 @@ def run_episode(
         if scenario.sensor_noise_std > 0.0:
             sample = disturbances.inject_sensor_noise(sample, scenario.sensor_noise_std, noise_rng)
         telemetry_history.append(sample)
+        if telemetry_observer is not None:
+            try:
+                telemetry_observer(sample)
+            except Exception:
+                # Data export is observability-only and must not interrupt the
+                # safety-critical decision loop.
+                pass
 
         tilt_deg = _tilt_from_vertical_deg(data.qpos[3:7])
         slip_mps = max(

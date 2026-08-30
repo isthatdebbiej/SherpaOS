@@ -11,11 +11,14 @@ uv sync --extra dev
 ```bash
 uv run sherpa preflight
 uv run sherpa test
-uv run sherpa simulate --scenario nominal --seed 1
+uv run sherpa simulate --scenario nominal --seed 1                 # 30 s (1,500 ticks at 50 Hz)
 uv run sherpa simulate --scenario mixed_traction_disturbance --seed 1
 uv run sherpa evaluate --matrix configs/eval.yaml
 uv run sherpa demo --offline
 ```
+
+`simulate --max-steps` counts 50 Hz control ticks, not 500 Hz physics steps:
+`--max-steps 300` is 6 seconds and the default `1,500` is 30 seconds.
 
 ```bash
 uv run ruff check .

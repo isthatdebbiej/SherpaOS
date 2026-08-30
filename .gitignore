@@ -17,6 +17,9 @@ build/
 third_party/mujoco_menagerie/
 third_party/unitree_rl_gym/
 artifacts/demo/*.mp4
+artifacts/demo-run/
+artifacts/runs/
+artifacts/walk/
 artifacts/playground/
 artifacts/incidents/*.json
 !artifacts/incidents/.gitkeep

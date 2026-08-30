@@ -2,13 +2,37 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from sherpaos.cli.main import app
+from sherpaos.cli.main import DEFAULT_SIMULATE_MAX_CONTROL_STEPS, app
 
 
 def test_preflight_command_is_green():
     result = CliRunner().invoke(app, ["preflight"])
     assert result.exit_code == 0, result.output
     assert '"status": "GREEN"' in result.output
+
+
+def test_simulate_default_is_a_30_second_control_horizon():
+    assert DEFAULT_SIMULATE_MAX_CONTROL_STEPS == 1_500
+
+
+def test_simulate_writes_an_aggregated_telemetry_snapshot(tmp_path):
+    snapshot = tmp_path / "telemetry.json"
+    result = CliRunner().invoke(
+        app,
+        [
+            "simulate",
+            "--max-steps",
+            "2",
+            "--telemetry-output",
+            str(snapshot),
+            "--output",
+            str(tmp_path / "run"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert snapshot.exists()
+    assert '"telemetry_snapshot"' in result.output
 
 
 def test_simulate_viewer_option_synchronizes_native_viewer(monkeypatch, tmp_path):

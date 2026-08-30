@@ -23,6 +23,28 @@
 - Optional native live visualization via `sherpa simulate --viewer`.
 - Local Unitree pretrained G1 walking-policy source and checkpoint, pinned with
   attribution; standalone upstream MuJoCo rollout verified.
+- Sensorized 12-DOF (41 sensors) and 29-DOF (95 sensors) G1 model builder; its
+  observable `low_state()` feeds the existing runner and five guards once per control tick.
+- `sherpa simulate` defaults to 1,500 50 Hz control ticks (30 seconds).
+- Contract-bound telemetry feed with in-process snapshots, atomic JSON files, and a
+  localhost HTTP interface at `/telemetry` and `/llm`; see `TELEMETRY_API.md`.
+- `sherpa walk` runs the pinned Unitree 12-DOF policy while continuously publishing
+  sensorized telemetry to `artifacts/walk/telemetry.json` and localhost port 8088.
+- Walking-feed activation resolves the bundled EBC route context and performs one
+  bounded, display-only Open-Meteo lookup; live conditions are published under
+  `environment.weather` and never enter the safety or locomotion paths.
+- `sherpa walk` publishes a separately labelled `battery.range_model` from
+  observed joint work, configured initial charge, and ambient temperature;
+  raw battery-gauge fields remain null until an onboard source is integrated.
+- Walking telemetry includes a display-only `decision_context` that exposes
+  stability/range evidence and explicitly names missing speed, gait, and
+  battery measurements for external LLM consumers.
+- The Unitree walking demo can simulate base speed, foot contact/load,
+  electrical power, and battery gauge telemetry, each labelled as simulator
+  output and excluded from all guard and policy inputs.
+- `sherpa walk --uphill` physically rotates the MuJoCo floor to the selected
+  Himalayan route grade and publishes that simulated incline in telemetry;
+  a five-second $4.17$ degree Lobuche run covered 2.23 m without falling.
 - Checksum-verified nominal and hazard demo smoke run.
 - Isolated, pinned MuJoCo Playground v0.2.0 bootstrap with CUDA JAX GPU gate.
 - Flat- and rough-terrain G1 reset/step smoke checks with non-finite rejection.
@@ -44,6 +66,15 @@
 - Unitree `deploy/deploy_mujoco/deploy_mujoco.py g1.yaml`: GREEN after adding the
   repository root to `PYTHONPATH`; loaded the 12-DOF TorchScript walking policy in the
   native viewer using its configured 0.5 m/s forward command.
+- `tests/unit/test_g1_sensors.py`: GREEN for Unitree 12-DOF and Menagerie 29-DOF
+  models; `test_nominal_scenario_survives_full_episode_no_nans`: GREEN through the
+  sensorized runner path.
+- `tests/unit/test_telemetry_feed.py`: GREEN for `RobotTelemetry` ingestion, null
+  unavailable fields, atomic JSON snapshots, and both localhost endpoints.
+- `test_unitree_walking_publishes_sensorized_telemetry`: GREEN for the pinned
+  12-DOF policy, three 50 Hz samples, and finite sensorized output.
+- `sherpa walk --headless --waypoint "Everest Base Camp"`: GREEN with a real
+  Open-Meteo response serialized beside the offline route context.
 - Nominal run produced no `REQUEST_HOLD`; it did spend 112/299 decisions in
   `LIMIT_SPEED` after 17 transient dynamics elevations plus policy cooldown. Do not tune
   this away without paired evaluation of nominal-progress impact.

@@ -133,3 +133,91 @@ MuJoCo model. The upstream `deploy_mujoco.py g1.yaml` rollout has been run local
 the config's 0.5 m/s forward command. It is not connected to SherpaOS's existing
 29-actuator telemetry/controller path: a new, verified 12-DOF telemetry and actuation
 adapter is required before claims about five-guard supervision of the walking policy.
+
+## 2026-08-29 — Sensorized scenes emit only adapter-visible telemetry
+
+`sherpaos.sim.g1_sensors.build_sensorized_scene(src_xml)` compiles a temporary MJCF
+wrapper with joint position, joint velocity, actuator force, pelvis orientation, angular
+velocity, and linear acceleration sensors. It produces 95 sensor elements for the
+29-DOF Menagerie model and 41 for the 12-DOF Unitree model, without modifying either
+source asset. `G1SensorSuite.low_state()` produces `RobotTelemetry` at each 50 Hz
+control tick in the existing runner, so the estimator/policy still receive only
+contract-defined onboard-observable values. The separately pinned Unitree walking-policy
+config is in `configs/unitree/g1_walking.yaml`; the Playground config remains unset
+because that policy is not Playground-compatible.
+
+## 2026-08-29 — Telemetry delivery is observational and contract-bound
+
+`TelemetryFeed` consumes finalized `RobotTelemetry` samples after they have been
+produced for the guard loop. It can publish an aggregated snapshot in process, by atomic
+JSON file, or through a localhost-only HTTP server with a compact `/llm` text form. The
+feed is an optional observer: it has no return path into the controller or guard policy,
+and feed failures cannot interrupt the runtime decision loop. Foot contacts, loads, and
+actual base speed are emitted only when an onboard-equivalent estimator provides them;
+the feed does not inspect simulator contacts or other evaluator-only state.
+
+## 2026-08-29 — Unitree walking telemetry is published before supervised actuation
+
+`sherpa walk` runs the pinned 12-DOF Unitree TorchScript policy, samples the
+sensorized model at its native 50 Hz policy rate, and publishes snapshots through
+`TelemetryFeed`. It remains an observational integration: the command does not
+route a Sherpa guard action back to the locomotion policy, because the policy's
+zero velocity command marches in place rather than honoring `REQUEST_HOLD`.
+This prevents an unsupported safety claim while still exposing live walking data
+to external consumers.
+
+## 2026-08-29 — Himalayan context is resolved offline on walking-feed activation
+
+`sherpa walk --waypoint <name>` resolves a named EBC waypoint from the bundled,
+versioned route artifact once when the feed is activated. Its location, elevation,
+slope, route segment, nearest-safe-waypoint distance, and exposure classification
+are published under `environment.himalaya` with every current snapshot. This is
+static route context, not a claim of live GPS, weather, or online terrain lookup;
+the runtime remains network-free and simulator truth remains excluded.
+
+## 2026-08-29 — Walking battery range is a display-only model, not a battery gauge
+
+The Unitree walking model does not expose an onboard battery gauge. `sherpa
+walk` therefore publishes `battery.range_model` only when explicitly enabled
+by its local `DerivedState` model. The model uses observed joint work, a fixed
+500 Wh nominal pack, fixed idle load, configured initial charge, activated
+ambient temperature, and commanded velocity as a speed assumption. It is
+separately labelled from `battery.gauge`, never changes `RobotTelemetry`, and
+has no return path into guard or locomotion decisions. This supplies usable
+display context without claiming a measured battery state.
+
+## 2026-08-29 — LLM telemetry reports evidence and data gaps, not safety actions
+
+`TelemetryFeed` publishes `decision_context` and prioritizes it in `/llm`.
+It summarizes stability and available energy evidence alongside an explicit
+list of absent decision inputs. This supports external explanation and human
+review while preventing an LLM from mistaking missing actual speed, contact,
+raw battery-gauge, or calibrated electrical-power data for nominal evidence.
+The deterministic SherpaOS guard/policy path remains the only action source.
+
+## 2026-08-29 — Walking auxiliary sensors are simulated display inputs
+
+The Unitree walking rollout may publish simulated base speed, foot contact/load,
+electrical power, and battery gauge values through `--simulate-auxiliary`.
+Those values are passed only to `TelemetryFeed`, with `simulated:*` provenance;
+they are not inserted into frozen `RobotTelemetry` or presented to a guard or
+locomotion policy. This permits a complete telemetry demonstration while
+preserving the real-versus-simulated evidence boundary.
+
+## 2026-08-29 — Walking terrain uses a physical MuJoCo incline from route grade
+
+`sherpa walk --uphill` rotates the MuJoCo floor geometry about world Y so the
+Unitree policy walks uphill along positive world X. The positive slope from the
+selected EBC route waypoint is used once at activation and emitted as
+`environment.terrain_simulation.uphill_slope_deg` with simulated provenance.
+This is a controlled uniform-grade terrain test, not a claim that the local
+waypoint artifact reconstructs the Himalayan surface.
+
+## 2026-08-29 — External weather is a bounded, display-only activation lookup
+
+`sherpa walk` fetches a single Open-Meteo snapshot for the selected route
+waypoint before the policy loop begins. The API marks the data with its external
+source and timestamps under `environment.weather`; failure is represented
+explicitly and does not block walking. No weather response is converted into
+`RobotTelemetry`, sent to a guard, or used by policy control. `--no-weather`
+preserves a fully offline walking activation.
