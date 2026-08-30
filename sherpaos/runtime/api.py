@@ -56,7 +56,29 @@ def _memory(day: int) -> dict[str, object]:
 
 
 def _radio_evidence(day: int) -> dict[str, object]:
-    return {"day_memory": _memory(day), "latest_live_decision": live_evidence.current()}
+    memory = _memory(day)
+    episodes = memory["episodes"]
+    windows = memory["windows"]
+    positives = memory["positive_windows"]
+    outcomes = memory["physical_outcomes"]
+    return {
+        "mission_day": memory["day"],
+        "scenario_family": memory["scenario_family"],
+        "mission_rehearsal": True,
+        "route_trials_reviewed": episodes["train"] + episodes["validation"],
+        "motion_windows_reviewed": windows["train"] + windows["validation"],
+        "mobility_risk_windows": (
+            positives["train"]["mobility"] + positives["validation"]["mobility"]
+        ),
+        "body_risk_windows": (
+            positives["train"]["dynamics"] + positives["validation"]["dynamics"]
+        ),
+        "physical_boundary_outcomes": (
+            outcomes["train_falls"] + outcomes["validation_falls"]
+        ),
+        "guard_context": memory["context"],
+        "latest_live_decision": live_evidence.current(),
+    }
 
 
 def _answer(question: str, day: int) -> tuple[str, dict[str, object]]:

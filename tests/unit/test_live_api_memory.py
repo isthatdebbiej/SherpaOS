@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi import HTTPException
 
-from sherpaos.runtime.api import _memory
+from sherpaos.runtime.api import _answer, _memory, live_evidence
 from sherpaos.runtime.live import LiveEvidenceBus
 
 
@@ -30,3 +30,11 @@ def test_journal_memory_is_exactly_days_one_to_four(tmp_path, monkeypatch):
     with pytest.raises(HTTPException) as exc:
         _memory(5)
     assert exc.value.status_code == 404
+
+
+def test_stop_question_never_invents_missing_live_evidence(monkeypatch):
+    monkeypatch.setattr(live_evidence, "current", lambda: None)
+    answer, evidence = _answer("Why did you stop?", 4)
+
+    assert "no live stop decision" in answer.casefold()
+    assert evidence["latest_live_decision"] is None

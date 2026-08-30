@@ -14,9 +14,11 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
   const [busy, setBusy] = useState(false);
   const [transmitting, setTransmitting] = useState(false);
   const [pembaSpeaking, setPembaSpeaking] = useState(false);
+  const [voiceAudio, setVoiceAudio] = useState<HTMLAudioElement | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const stream = useRef<MediaStream | null>(null);
+  const pressed = useRef(false);
 
   function addAnswer(question: string, answer: string) {
     setMessages((items) => [...items, { from: "operator", text: question }, { from: "pemba", text: answer }]);
@@ -63,24 +65,34 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
 
   async function begin() {
     if (busy) return;
+    pressed.current = true;
     try {
-      stream.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.current = media;
+      if (!pressed.current) {
+        media.getTracks().forEach((track) => track.stop());
+        return;
+      }
       chunks.current = [];
-      const next = new MediaRecorder(stream.current);
+      const next = new MediaRecorder(media);
       next.ondataavailable = (event) => { if (event.data.size) chunks.current.push(event.data); };
-      next.onstop = () => void ask(new Blob(chunks.current, { type: next.mimeType || "audio/webm" }));
+      next.onstop = () => {
+        const payload = new Blob(chunks.current, { type: next.mimeType || "audio/webm" });
+        if (payload.size) void ask(payload);
+      };
       recorder.current = next;
       next.start();
       setTransmitting(true);
     } catch {
+      pressed.current = false;
       setMessages((items) => [...items, { from: "pemba", text: "I need microphone permission to hear you." }]);
     }
   }
 
   function end() {
-    if (!transmitting) return;
+    pressed.current = false;
     setTransmitting(false);
-    recorder.current?.stop();
+    if (recorder.current?.state === "recording") recorder.current.stop();
     stream.current?.getTracks().forEach((track) => track.stop());
   }
 
@@ -104,7 +116,7 @@ export function MemoryRadio({ initialDay = 1, embedded = false }: { initialDay?:
       <div className={styles.chatLog} aria-live="polite">{messages.map((message, index) => <div key={index} className={`${styles.chatBubble} ${message.from === "pemba" ? styles.pembaBubble : styles.operatorBubble}`}><small>{message.from === "pemba" ? "Pemba" : "You"}</small>{message.text}</div>)}</div>
       <form className={styles.composer} onSubmit={send}><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Why did you stop?"/><button disabled={!draft.trim() || busy} aria-label="Send">↗</button></form>
       <div className={`${styles.wave} ${(busy || transmitting) ? styles.active : ""}`} aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/></div>
-      <button className={`${styles.ptt} ${transmitting ? styles.transmitting : ""}`} disabled={busy} onPointerDown={() => void begin()} onPointerUp={end} onPointerCancel={end}>{busy ? "HF INFERENCE RUNNING…" : transmitting ? "RELEASE TO SEND" : "HOLD TO TALK"}</button>
+      <button className={`${styles.ptt} ${transmitting ? styles.transmitting : ""}`} disabled={busy} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); void begin(); }} onPointerUp={end} onPointerCancel={end}>{busy ? "HF INFERENCE RUNNING…" : transmitting ? "RELEASE TO SEND" : "PRESS AND HOLD TO TALK"}</button>{voiceAudio && !pembaSpeaking && <button type="button" className={styles.ptt} onClick={() => { setPembaSpeaking(true); voiceAudio.currentTime = 0; void voiceAudio.play(); }}>PLAY PEMBA VOICE</button>}
     </div>
   </aside>;
 }
