@@ -20,7 +20,7 @@ from sherpaos.datasets.generate import (
     _wind_for,
     scenario_for,
 )
-from sherpaos.sim import disturbances
+from sherpaos.sim import disturbances, himalaya_scene
 from sherpaos.sim.himalaya_scene import scene_xml, terrain_slope_for_geom
 from sherpaos.sim.runner import FALL_PELVIS_Z_M, FALL_TILT_DEG
 from sherpaos.sim.v26_playground import (
@@ -67,6 +67,11 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--category", choices=("nominal", "mobility", "dynamics", "combined"))
     parser.add_argument("--seed", type=int)
     parser.add_argument("--storm", action="store_true")
+    parser.add_argument(
+        "--high-slope-qualified",
+        action="store_true",
+        help="Use the qualified 10/16/22/30 degree visual profile and require 16 degree contact.",
+    )
     return parser.parse_args()
 
 
@@ -140,6 +145,15 @@ def main() -> None:
         if scenario is not None
         else 0.0
     )
+    if args.high_slope_qualified:
+        if terrain_zone != 4:
+            raise SystemExit("--high-slope-qualified requires a seed mapped to steep_ice")
+        profiles = list(himalaya_scene.TERRAIN_ZONE_PROFILES)
+        lengths = list(himalaya_scene.TERRAIN_ZONE_LENGTHS_M)
+        profiles[4] = (10.0, 16.0, 22.0, 30.0)
+        lengths[4] = (0.65, 0.90, 1.30, 2.65)
+        himalaya_scene.TERRAIN_ZONE_PROFILES = tuple(profiles)
+        himalaya_scene.TERRAIN_ZONE_LENGTHS_M = tuple(lengths)
     if scenario is not None:
         args.command_vx, args.command_vy, args.command_yaw = _command_for(category_index)
     if shutil.which("ffmpeg") is None:
@@ -199,6 +213,7 @@ def main() -> None:
     robot_geom_ids = np.flatnonzero(model.geom_bodyid > 0)
     visibility: list[tuple[int, int, int]] = []
     start_x, min_height, max_tilt, fell, completed = float(data.qpos[0]), 10.0, 0.0, False, 0
+    max_contact_slope_deg = 0.0
     encoder = subprocess.Popen(
         [
             "ffmpeg",
@@ -290,6 +305,7 @@ def main() -> None:
                 ),
                 default=0.0,
             )
+            max_contact_slope_deg = max(max_contact_slope_deg, slope_deg)
             slip_mps = max(_foot_slip(model, data, foot, terrain_ids) for foot in feet)
             risk_state = _risk_state(
                 forecast_wind_mps=wind_target_mps,
@@ -358,6 +374,11 @@ def main() -> None:
             f"robot visibility gate failed: {min_pixels} pixels, {min_height_px}px tall, "
             f"{min_frame_margin_px}px border margin"
         )
+    if args.high_slope_qualified and max_contact_slope_deg < 16.0:
+        args.output.unlink(missing_ok=True)
+        raise SystemExit(
+            f"high-slope qualification failed: contacted {max_contact_slope_deg:.1f} degrees"
+        )
     report = {
         "policy": "v26 iter42290 frozen",
         "controller_only": True,
@@ -375,6 +396,8 @@ def main() -> None:
         "seed": args.seed,
         "storm": wind_target_mps >= 25.0,
         "terrain_zone": terrain_zone,
+        "high_slope_qualified": args.high_slope_qualified,
+        "max_contact_slope_deg": max_contact_slope_deg,
         "wind_target_mps": wind_target_mps,
         "condition_overlay": True,
         "overlay_fields": [
