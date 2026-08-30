@@ -49,6 +49,8 @@ def build_episode_context(
         "distance_to_safety_m": [],
         "localization_valid": [],
         "wind_mps": [],
+        "current_wind_mps": [],
+        "forecast_wind_mps": [],
         "ambient_temperature_c": [],
         "telemetry_score": [],
         "telemetry_confidence": [],
@@ -75,10 +77,17 @@ def build_episode_context(
             wind_mps=current_wind_mps,
             temperature_c=sample.battery_temperature_c,
         )
+        forecast_context = build_mission_context(
+            route,
+            now,
+            cumulative_distance_m=distance,
+            wind_mps=wind_mps,
+            temperature_c=sample.battery_temperature_c,
+        )
         reports = motion.observe(sample, now)
         telemetry_report = reports[2]
         battery_report = battery.observe(sample, now)
-        geographic_report = geography.evaluate(context, now)
+        geographic_report = geography.evaluate(forecast_context, now)
         values = {
             "control_step": step,
             "timestamp_s": now,
@@ -95,6 +104,8 @@ def build_episode_context(
             "distance_to_safety_m": context.distance_to_safe_waypoint_m,
             "localization_valid": context.valid,
             "wind_mps": context.wind_mps,
+            "current_wind_mps": context.wind_mps,
+            "forecast_wind_mps": forecast_context.wind_mps,
             "ambient_temperature_c": context.temperature_c,
         }
         _add_report(values, "telemetry", telemetry_report)

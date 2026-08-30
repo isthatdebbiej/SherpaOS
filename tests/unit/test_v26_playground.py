@@ -1,5 +1,6 @@
 import numpy as np
 
+from scripts.render_v26_himalaya import _condition_overlay, _risk_state
 from sherpaos.sim.himalaya_scene import (
     TERRAIN_ZONE_LENGTHS_M,
     TERRAIN_ZONE_NAMES,
@@ -37,6 +38,21 @@ def test_visibility_measurement() -> None:
     segmentation = np.full((20, 30, 2), -1, dtype=np.int32)
     segmentation[4:15, 8:20, 0] = 7
     assert robot_visibility(segmentation, np.array([7])) == (132, 11)
+
+
+def test_video_condition_overlay_and_forecast_no_go() -> None:
+    state = _risk_state(
+        forecast_wind_mps=55.6,
+        current_wind_mps=8.0,
+        slope_deg=4.0,
+        slip_mps=0.1,
+        tilt_deg=5.0,
+    )
+    assert state == "NO-GO"
+    frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    rendered = _condition_overlay(frame, ["Wind now: 8.0 m/s"], state)
+    assert rendered.shape == frame.shape
+    assert np.any(rendered != frame)
 
 
 def test_scene_uses_connected_visible_collision_segments() -> None:

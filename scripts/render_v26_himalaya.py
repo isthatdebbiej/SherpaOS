@@ -12,6 +12,7 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 from sherpaos.datasets.generate import (
     _command_for,
@@ -20,7 +21,7 @@ from sherpaos.datasets.generate import (
     scenario_for,
 )
 from sherpaos.sim import disturbances
-from sherpaos.sim.himalaya_scene import scene_xml
+from sherpaos.sim.himalaya_scene import scene_xml, terrain_slope_for_geom
 from sherpaos.sim.runner import FALL_PELVIS_Z_M, FALL_TILT_DEG
 from sherpaos.sim.v26_playground import (
     DEFAULT_POSE,
@@ -34,10 +35,15 @@ from sherpaos.sim.v26_playground import (
     robot_visibility,
 )
 from sherpaos.sim.v26_runner import (
+    BASELINE_FRICTION,
+    HAZARD_ONSET_STEP,
+    HAZARD_RAMP_STEPS,
     LEFT_FOOT_BODY,
     RIGHT_FOOT_BODY,
     TERRAIN_GEOMS,
     _body_geoms,
+    _contacting_terrain_geoms,
+    _foot_slip,
     _geom_id,
 )
 from sherpaos.sim.weather import aerodynamic_force_n, wind_speed_at_step
@@ -86,6 +92,40 @@ def _robot_frame_margin(segmentation: np.ndarray, robot_geom_ids: np.ndarray) ->
         return 0
     height, width = mask.shape
     return int(min(rows.min(), height - 1 - rows.max(), columns.min(), width - 1 - columns.max()))
+
+
+def _risk_state(
+    *,
+    forecast_wind_mps: float,
+    current_wind_mps: float,
+    slope_deg: float,
+    slip_mps: float,
+    tilt_deg: float,
+) -> str:
+    if forecast_wind_mps >= 50.0 or slip_mps >= 0.6 or tilt_deg >= 25.0:
+        return "NO-GO"
+    if current_wind_mps >= 15.0 or slope_deg >= 16.0 or slip_mps >= 0.4 or tilt_deg >= 15.0:
+        return "CAUTION"
+    return "GO"
+
+
+def _condition_overlay(frame: np.ndarray, lines: list[str], risk_state: str) -> np.ndarray:
+    """Draw readable, deterministic condition evidence without hiding the robot."""
+    image = Image.fromarray(frame)
+    draw = ImageDraw.Draw(image, "RGBA")
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 21)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 25)
+    except OSError:
+        font = title_font = ImageFont.load_default()
+    color = {"GO": (40, 190, 90), "CAUTION": (240, 175, 35), "NO-GO": (225, 65, 65)}[risk_state]
+    draw.rounded_rectangle(
+        (24, 22, 470, 224), radius=14, fill=(5, 12, 24, 205), outline=color + (255,), width=3
+    )
+    draw.text((44, 34), f"SHERPA RISK: {risk_state}", font=title_font, fill=color + (255,))
+    for index, line in enumerate(lines):
+        draw.text((44, 75 + 28 * index), line, font=font, fill=(245, 248, 255, 255))
+    return np.asarray(image)
 
 
 def main() -> None:
@@ -142,13 +182,14 @@ def main() -> None:
         model.actuator_biasprm[aid, 2] = -KD[index]
     terrain_ids = {_geom_id(model, name) for name in TERRAIN_GEOMS}
     terrain_ids.discard(-1)
-    if scenario is not None and scenario.friction < 0.99:
+    feet = tuple(_body_geoms(model, name) for name in (LEFT_FOOT_BODY, RIGHT_FOOT_BODY))
+    if scenario is not None:
+        initial_friction = max(scenario.friction, BASELINE_FRICTION)
         for geom_id in terrain_ids:
-            model.geom_friction[geom_id, 0] = scenario.friction
-        if scenario.friction < 0.99:
-            for body_name in (LEFT_FOOT_BODY, RIGHT_FOOT_BODY):
-                for geom_id in _body_geoms(model, body_name):
-                    model.geom_friction[geom_id, 0] = scenario.friction
+            model.geom_friction[geom_id, 0] = initial_friction
+        for foot_geoms in feet:
+            for geom_id in foot_geoms:
+                model.geom_friction[geom_id, 0] = initial_friction
     mujoco.mj_forward(model, data)
     pelvis = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
     session = ort.InferenceSession(str(args.policy), providers=["CPUExecutionProvider"])
@@ -191,6 +232,18 @@ def main() -> None:
     wind_speed_mps = 0.0
     try:
         for step in range(args.steps):
+            effective_friction = 1.0
+            if scenario is not None:
+                friction_phase = np.clip((step - HAZARD_ONSET_STEP) / HAZARD_RAMP_STEPS, 0.0, 1.0)
+                friction_phase = friction_phase * friction_phase * (3.0 - 2.0 * friction_phase)
+                effective_friction = initial_friction + friction_phase * (
+                    scenario.friction - initial_friction
+                )
+                for geom_id in terrain_ids:
+                    model.geom_friction[geom_id, 0] = effective_friction
+                for foot_geoms in feet:
+                    for geom_id in foot_geoms:
+                        model.geom_friction[geom_id, 0] = effective_friction
             if scenario is not None and scenario.actuator_health < 1.0 and step >= 200:
                 alpha = min(1.0, (step - 200) / 50.0)
                 health = 1.0 + alpha * (scenario.actuator_health - 1.0)
@@ -226,6 +279,25 @@ def main() -> None:
                 physics_step += 1
             gravity = projected_gravity(data.qpos[3:7])
             tilt = float(np.degrees(np.arccos(np.clip(-gravity[2], -1, 1))))
+            contact_geoms = _contacting_terrain_geoms(data, feet, terrain_ids)
+            slope_deg = max(
+                (
+                    terrain_slope_for_geom(
+                        terrain_zone,
+                        mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id),
+                    )
+                    for geom_id in contact_geoms
+                ),
+                default=0.0,
+            )
+            slip_mps = max(_foot_slip(model, data, foot, terrain_ids) for foot in feet)
+            risk_state = _risk_state(
+                forecast_wind_mps=wind_target_mps,
+                current_wind_mps=wind_speed_mps,
+                slope_deg=slope_deg,
+                slip_mps=slip_mps,
+                tilt_deg=tilt,
+            )
             min_height, max_tilt, completed = (
                 min(min_height, float(data.qpos[2])),
                 max(max_tilt, tilt),
@@ -244,6 +316,19 @@ def main() -> None:
                 assert encoder.stdin is not None
                 frame = renderer.render()
                 frame = _blowing_snow(frame, storm_rng, wind_speed_mps)
+                frame = _condition_overlay(
+                    frame,
+                    [
+                        f"Wind now: {wind_speed_mps:4.1f} m/s ({wind_speed_mps * 3.6:5.1f} km/h)",
+                        (
+                            f"Wind forecast: {wind_target_mps:4.1f} m/s "
+                            f"({wind_target_mps * 3.6:5.1f} km/h)"
+                        ),
+                        f"Slope/contact: {slope_deg:4.1f} deg   friction: {effective_friction:.2f}",
+                        f"Foot slip: {slip_mps:.2f} m/s   body tilt: {tilt:.1f} deg",
+                    ],
+                    risk_state,
+                )
                 encoder.stdin.write(frame.tobytes())
                 if step % 50 == 0:
                     renderer.enable_segmentation_rendering()
@@ -291,6 +376,16 @@ def main() -> None:
         "storm": wind_target_mps >= 25.0,
         "terrain_zone": terrain_zone,
         "wind_target_mps": wind_target_mps,
+        "condition_overlay": True,
+        "overlay_fields": [
+            "risk_state",
+            "current_wind_mps",
+            "forecast_wind_mps",
+            "contact_slope_deg",
+            "friction",
+            "foot_slip_mps",
+            "body_tilt_deg",
+        ],
         "wind_physics_applied": True,
         "wind_speed_at_end_mps": wind_speed_mps,
         "wind_speed_at_end_kmh": wind_speed_mps * 3.6,

@@ -80,6 +80,11 @@ def test_deterministic_generation_and_observation_label_separation(
     with np.load(first / "labels/shard-000.npz", allow_pickle=False) as labels:
         assert "mobility_targets" in labels.files
         assert set(labels["completed_episode_ids"]) == {"episode-000", "episode-050"}
+    with np.load(first / "context/shard-000.npz", allow_pickle=False) as context:
+        assert "current_wind_mps" in context.files
+        assert "forecast_wind_mps" in context.files
+        assert np.array_equal(context["wind_mps"], context["current_wind_mps"])
+        assert np.all(context["forecast_wind_mps"] >= 0.0)
     assert validate_dataset(first)["status"] == "GREEN"
 
 
