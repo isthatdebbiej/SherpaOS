@@ -1,0 +1,175 @@
+"""Train the two-head SherpaOS temporal risk model without opening test data."""
+
+import argparse
+import json
+import os
+import random
+from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+import torch
+import yaml
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
+
+
+class TCN(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        layers = []
+        width = 103
+        for i, out in enumerate(channels):
+            layers += [
+                nn.Conv1d(width, out, 5, padding=4 * 2**i, dilation=2**i),
+                nn.GELU(),
+                nn.Dropout(0.1),
+            ]
+            width = out
+        self.net = nn.Sequential(*layers)
+        self.head = nn.Linear(width, 2)
+
+    def forward(self, x):
+        for layer in self.net:
+            x = layer(x)
+            if isinstance(layer, nn.Conv1d):
+                x = x[..., :100]
+        return self.head(x[..., -1])
+
+
+def load(root, split):
+    rows = [json.loads(x) for x in (root / f"{split}_index.jsonl").read_text().splitlines()]
+    shards = defaultdict(set)
+    for r in rows:
+        shards[(r["observations"], r["labels"])].add(r["episode_id"])
+    xs = []
+    ys = []
+    ids = []
+    for (op, lp), wanted in sorted(shards.items()):
+        with (
+            np.load(root / op, allow_pickle=False) as o,
+            np.load(root / lp, allow_pickle=False) as labels,
+        ):
+            assert np.array_equal(o["episode_ids"], labels["episode_ids"])
+            m = np.isin(o["episode_ids"], list(wanted))
+            xs += [o["observations"][m]]
+            ys += [np.c_[labels["mobility_targets"][m], labels["dynamics_targets"][m]]]
+            ids += [o["episode_ids"][m]]
+    x = np.concatenate(xs).astype("float32")
+    y = np.concatenate(ys).astype("float32")
+    e = np.concatenate(ids)
+    assert x.shape[1:] == (100, 103) and np.isfinite(x).all()
+    assert set(e) == {r["episode_id"] for r in rows}
+    return x, y, e
+
+
+def metrics(y, p):
+    out = {}
+    for j, n in enumerate(("mobility", "dynamics")):
+        order = np.argsort(-p[:, j])
+        t = y[order, j]
+        tp = np.cumsum(t)
+        fp = np.cumsum(1 - t)
+        rec = tp / max(t.sum(), 1)
+        prec = tp / np.maximum(tp + fp, 1)
+        ap = np.sum((rec - np.r_[0, rec[:-1]]) * prec)
+        auc = np.trapezoid(np.r_[0, rec, 1], np.r_[0, fp / max(len(t) - t.sum(), 1), 1])
+        best = max(
+            (
+                5
+                * (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(y[:, j] == 1), 1))
+                * (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(p[:, j] >= q), 1))
+                / max(
+                    4 * (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(p[:, j] >= q), 1))
+                    + (np.sum((p[:, j] >= q) & (y[:, j] == 1)) / max(np.sum(y[:, j] == 1), 1)),
+                    1e-9,
+                ),
+                q,
+            )
+            for q in np.linspace(0.05, 0.95, 181)
+        )[1]
+        out[n] = {
+            "average_precision": float(ap),
+            "auroc": float(auc),
+            "brier": float(np.mean((p[:, j] - y[:, j]) ** 2)),
+            "threshold": float(best),
+        }
+    return out
+
+
+a = argparse.ArgumentParser()
+a.add_argument("--dataset", type=Path, required=True)
+a.add_argument("--output", type=Path, required=True)
+a.add_argument("--push-to-hub")
+z = a.parse_args()
+c = yaml.safe_load(Path("configs/training.yaml").read_text())
+random.seed(c["seed"])
+np.random.seed(c["seed"])
+torch.manual_seed(c["seed"])
+xt, yt, it = load(z.dataset, "train")
+xv, yv, iv = load(z.dataset, "validation")
+assert not (set(it) & set(iv))
+mean = xt.mean((0, 1))
+std = xt.std((0, 1))
+std[std < 1e-6] = 1
+xt = (xt - mean) / std
+xv = (xv - mean) / std
+dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = TCN(c["channels"]).to(dev)
+w = (len(yt) - yt.sum(0)) / np.maximum(yt.sum(0), 1)
+lossfn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(w, device=dev))
+opt = torch.optim.AdamW(model.parameters(), lr=c["learning_rate"])
+tl = DataLoader(
+    TensorDataset(torch.from_numpy(xt), torch.from_numpy(yt)),
+    batch_size=c["batch_size"],
+    shuffle=True,
+)
+best = 1e9
+state = None
+stale = 0
+history = []
+for epoch in range(c["max_epochs"]):
+    model.train()
+    for x, y in tl:
+        opt.zero_grad()
+        loss = lossfn(model(x.to(dev).transpose(1, 2)), y.to(dev))
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), 1)
+        opt.step()
+    model.eval()
+    with torch.no_grad():
+        logits = model(torch.from_numpy(xv).to(dev).transpose(1, 2))
+        vl = nn.functional.binary_cross_entropy_with_logits(
+            logits, torch.from_numpy(yv).to(dev)
+        ).item()
+    history += [{"epoch": epoch + 1, "validation_loss": vl}]
+    print(history[-1], flush=True)
+    if vl < best:
+        best = vl
+        state = {k: v.cpu() for k, v in model.state_dict().items()}
+        stale = 0
+    else:
+        stale += 1
+        if stale >= c["patience"]:
+            break
+p = torch.sigmoid(logits).cpu().numpy()
+z.output.mkdir(parents=True, exist_ok=True)
+torch.save({"state_dict": state, "config": c}, z.output / "model.pt")
+for n, v in {
+    "normalization.json": {"mean": mean.tolist(), "std": std.tolist()},
+    "validation_metrics.json": metrics(yv, p),
+    "training_manifest.json": {
+        "device": str(dev),
+        "train_episodes": len(set(it)),
+        "validation_episodes": len(set(iv)),
+        "history": history,
+        "test_split_opened": False,
+    },
+}.items():
+    (z.output / n).write_text(json.dumps(v, indent=2))
+if z.push_to_hub:
+    from huggingface_hub import HfApi
+
+    api = HfApi(token=os.environ["HF_TOKEN"])
+    api.create_repo(z.push_to_hub, private=True, exist_ok=True)
+    api.upload_folder(repo_id=z.push_to_hub, folder_path=z.output)

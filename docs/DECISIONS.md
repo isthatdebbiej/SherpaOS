@@ -1,5 +1,14 @@
 # DECISIONS.md — timestamped decisions and rejected alternatives
 
+## 2026-08-30 — Environmental context remains deterministic
+
+Wind and ambient temperature already existed as optional `MissionContext` fields but
+were not scored. The geographic guard now evaluates high wind and extreme cold with
+explicit fixed thresholds and conservative severe-condition hold overrides. New reason
+codes were added to the shared contract so evidence can distinguish terrain from weather.
+Depth remains outside `RobotTelemetry`: raw camera/depth frames require their own timed,
+calibrated adapter contract before they can safely influence runtime decisions.
+
 ## 2026-08-29 11:24 PT — Repo location and layout
 
 Repo root created at `sherpaos/` (containing package `sherpaos/sherpaos/`), per explicit

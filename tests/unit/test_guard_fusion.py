@@ -92,6 +92,16 @@ def test_supervisor_emits_all_five_named_reports():
     assert decision.action in GuardAction
 
 
+def test_future_dated_telemetry_cannot_pass_health_guard():
+    supervisor = FiveGuardSupervisor()
+    decision = supervisor.decide(telemetry(now=11.0), context(now=10.0), now=10.0)
+    health = next(
+        item for item in decision.guard_reports if item.guard == GuardName.TELEMETRY_HEALTH
+    )
+    assert ReasonCode.FUTURE_DATED_TELEMETRY in health.reason_codes
+    assert health.recommended_action != GuardAction.PASS
+
+
 def test_missing_geography_never_silently_passes():
     supervisor = FiveGuardSupervisor()
     decision = supervisor.decide(telemetry(), None, now=10.0)

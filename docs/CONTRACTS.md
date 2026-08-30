@@ -50,7 +50,8 @@ never let four calm guards dilute one alarmed guard's signal into a mid-range av
    labeled `sim` (via `RobotTelemetry.source`) and varied across held-out battery
    scenarios — never presented as a calibrated real-G1 predictor without real telemetry.
 5. **Geographic-risk guard** (`GuardName.GEOGRAPHIC`) — slope, elevation, route exposure,
-   distance to safe waypoint, terrain-data quality, read from `MissionContext` (below).
+   distance to safe waypoint, terrain-data quality, optional high-wind/extreme-cold
+   context, read from `MissionContext` (below).
 
 ## ActuationReceipt
 

@@ -143,6 +143,15 @@ def test_feature_window_staleness_threshold():
     assert stale.is_stale is True
 
 
+def test_feature_window_detects_future_dated_sample():
+    window = FeatureWindow()
+    window.push(make_telemetry(monotonic_time=1.0, sequence=1))
+
+    features = window.compute_features(now_monotonic=0.0)
+
+    assert features.is_future_dated
+
+
 def test_feature_window_missing_optional_fields_scoped_narrowly():
     window = FeatureWindow()
     # joint_effort + commanded_velocity missing -> reported (risk-relevant)

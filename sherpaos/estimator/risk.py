@@ -47,6 +47,8 @@ STALE_SCORE_FLOOR = 0.5
 STALE_CONFIDENCE_CEILING = 0.25
 OUT_OF_ORDER_SCORE_FLOOR = 0.45
 OUT_OF_ORDER_CONFIDENCE_CEILING = 0.4
+FUTURE_DATED_SCORE_FLOOR = 0.55
+FUTURE_DATED_CONFIDENCE_CEILING = 0.15
 
 # A permanently-missing optional sensor (e.g. a G1 unit with no effort
 # sensing) is not "corrupt data" the way NaN/stale/reordered samples are --
@@ -202,6 +204,10 @@ def data_quality_gate(f: Features) -> tuple[float, float, list[ReasonCode]]:
         score_floor = max(score_floor, OUT_OF_ORDER_SCORE_FLOOR)
         confidence = min(confidence, OUT_OF_ORDER_CONFIDENCE_CEILING)
         reasons.append(ReasonCode.OUT_OF_ORDER)
+    if f.is_future_dated:
+        score_floor = max(score_floor, FUTURE_DATED_SCORE_FLOOR)
+        confidence = min(confidence, FUTURE_DATED_CONFIDENCE_CEILING)
+        reasons.append(ReasonCode.FUTURE_DATED_TELEMETRY)
     if f.missing_optional_fields:
         score_floor = max(score_floor, MISSING_FIELD_SCORE_FLOOR)
         confidence = min(confidence, MISSING_FIELD_CONFIDENCE_CEILING)

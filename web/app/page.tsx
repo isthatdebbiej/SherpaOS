@@ -5,208 +5,40 @@ import { AnimatePresence, motion } from "motion/react";
 import { expeditionDays } from "@/data/days";
 import type { ExpeditionDay } from "@/types/expedition";
 import { MemoryRadio } from "@/components/MemoryRadio";
+import { ExperienceTabs, type ExperienceTab } from "@/components/ExperienceTabs";
 
-const currentDay = expeditionDays.find((day) => day.status === "waiting") ?? expeditionDays[0];
+const today = expeditionDays.find(day => day.status === "waiting") ?? expeditionDays[0];
 
 export default function Home() {
-  const [selectedDay, setSelectedDay] = useState<ExpeditionDay>(currentDay);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [pembaReaction, setPembaReaction] = useState("waiting for today’s memories…");
-  const [collectedMemories, setCollectedMemories] = useState<string[]>([]);
-  const [lanternOn, setLanternOn] = useState(true);
-
+  const [selectedDay, setSelectedDay] = useState<ExpeditionDay>(today);
+  const [activeTab, setActiveTab] = useState<ExperienceTab>("diary");
+  const [speaking, setSpeaking] = useState(false);
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
-  function selectDay(day: ExpeditionDay) {
-    if (day.status === "locked") return;
-    window.speechSynthesis?.cancel();
-    setIsSpeaking(false);
-    setSelectedDay(day);
-  }
+  function selectDay(day: ExpeditionDay) { if (day.status === "locked") return; window.speechSynthesis?.cancel(); setSpeaking(false); setSelectedDay(day); }
+  function parallax(event: PointerEvent<HTMLElement>) { const rect=event.currentTarget.getBoundingClientRect(); event.currentTarget.style.setProperty("--mx",String((event.clientX-rect.left)/rect.width-.5)); event.currentTarget.style.setProperty("--my",String((event.clientY-rect.top)/rect.height-.5)); }
+  function speak() { if (!("speechSynthesis" in window)) return; if(speaking){window.speechSynthesis.cancel();setSpeaking(false);return} const line=new SpeechSynthesisUtterance("The Western Cwm is bright and quiet today. I am saving my battery, watching the blue shadows, and waiting for my memories to arrive from base.");line.rate=.87;line.pitch=1.08;line.onend=line.onerror=()=>setSpeaking(false);setSpeaking(true);window.speechSynthesis.speak(line); }
+  const current=selectedDay.day===today.day;
 
-  function moveMountain(event: PointerEvent<HTMLElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-    const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-    event.currentTarget.style.setProperty("--pointer-x", x.toFixed(2));
-    event.currentTarget.style.setProperty("--pointer-y", y.toFixed(2));
-  }
+  return <main className={`expedition ${activeTab}Mode ${current?"":"archiveMode"}`} onPointerMove={parallax}>
+    <div className="grain" aria-hidden="true"/>
+    <header className="topbar">
+      <a className="wordmark" href="#"><span>▲</span><strong>ROBOT EVEREST</strong><small>Pemba field journal</small></a>
+      <ExperienceTabs active={activeTab} onChange={setActiveTab} radioReady/>
+      <div className="baseStatus"><i/> EXPEDITION <strong>LIVE</strong></div>
+    </header>
+    <section className="heroCopy"><p className="kicker">EXPEDITION 001 <span>·</span> LIVE FROM EVEREST</p><h1>PEMBA&apos;S<br/><em>JOURNAL</em></h1><p className="intro">Five days. One careful robot.<br/>A mountain full of memories.</p></section>
 
-  function pokePemba() {
-    const reactions = [
-      "oh! hello down there 👋",
-      "my antenna says you are friendly",
-      "do you think snow tastes cold?",
-      "I am practicing my brave face!",
-    ];
-    const currentIndex = reactions.indexOf(pembaReaction);
-    setPembaReaction(reactions[(currentIndex + 1) % reactions.length]);
-  }
+    <section className="everestStage" aria-label="Interactive Everest expedition route">
+      <div className="summitMist"/>
+      <svg className="ridgeFace" viewBox="0 0 1000 760" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="ridgeIce" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#8fa5ba"/><stop offset=".42" stopColor="#31445a"/><stop offset="1" stopColor="#08111e"/></linearGradient><pattern id="ridgeLines" width="15" height="15" patternUnits="userSpaceOnUse" patternTransform="rotate(19)"><path d="M0 0V15" stroke="#dbe8ef" strokeOpacity=".1" strokeWidth="2"/></pattern></defs><path d="M0 760V704L105 664 205 626 305 570 405 548 505 489 610 459 710 405 792 350 858 282 916 378 1000 451V760Z" fill="url(#ridgeIce)"/><path d="M0 760V704L105 664 205 626 305 570 405 548 505 489 610 459 710 405 792 350 858 282 916 378 1000 451V760Z" fill="url(#ridgeLines)"/><path d="M858 282L916 378 1000 451V760H730L792 556 821 416Z" fill="#07101c" opacity=".72"/><path d="M858 282L821 416 792 556 730 760" fill="none" stroke="#d7e4ec" strokeOpacity=".18" strokeWidth="4"/></svg>
+      <svg className="mountainFace" viewBox="0 0 1000 760" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><defs><linearGradient id="rock" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#8996a5"/><stop offset=".38" stopColor="#263549"/><stop offset="1" stopColor="#050a12"/></linearGradient><linearGradient id="ice" x1="0" y1="0" x2=".8" y2="1"><stop stopColor="#e6eef2" stopOpacity=".86"/><stop offset=".45" stopColor="#66809b" stopOpacity=".55"/><stop offset="1" stopColor="#152235" stopOpacity=".12"/></linearGradient><pattern id="hatch" width="13" height="13" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><path d="M0 0V13" stroke="#dce7ed" strokeOpacity=".09" strokeWidth="2"/></pattern><filter id="blur"><feGaussianBlur stdDeviation="18"/></filter></defs><path d="M10 760L150 655 251 602 330 505 403 457 467 345 532 287 590 166 641 57 700 126 748 248 811 329 867 456 1000 592V760Z" fill="url(#rock)"/><path d="M641 57L590 166 532 287 467 345 403 457 330 505 251 602 150 655 10 760H500L595 619 650 471 679 294Z" fill="url(#ice)"/><path d="M641 57L700 126 748 248 811 329 867 456 1000 592V760H500L595 619 650 471 679 294Z" fill="#07101d" opacity=".82"/><path d="M641 57L679 294 650 471 595 619 500 760" fill="none" stroke="#b7c8d4" strokeOpacity=".18" strokeWidth="4"/><path d="M10 760L150 655 251 602 330 505 403 457 467 345 532 287 590 166 641 57 700 126 748 248 811 329 867 456 1000 592V760Z" fill="url(#hatch)"/><ellipse cx="720" cy="150" rx="260" ry="80" fill="#9bb9d0" opacity=".13" filter="url(#blur)"/></svg>
+      <svg className="routeLine" viewBox="0 0 1000 760" preserveAspectRatio="none" aria-label="Route to the summit"><path className="routeShadow" d="M92 676C175 647 229 613 307 582S425 556 507 509 624 473 704 422 804 354 858 294"/><path className="routeFuture" d="M92 676C175 647 229 613 307 582S425 556 507 509 624 473 704 422 804 354 858 294"/><path className="routeDone" d="M92 676C175 647 229 613 307 582S425 556 507 509"/></svg>
+      <nav className="campStops" aria-label="Expedition camps">{expeditionDays.map(day=><button key={day.day} type="button" className={`stop stop${day.day} ${day.status} ${selectedDay.day===day.day?"active":""}`} disabled={day.status==="locked"} onClick={()=>selectDay(day)}><i/><span><b>0{day.day}</b>{day.camp}<small>{day.altitude.toLocaleString()} M</small></span></button>)}</nav>
+      <motion.button className="robotPin" type="button" aria-label="Pemba at Western Cwm" animate={{y:[0,-5,0]}} transition={{duration:2.8,repeat:Infinity,ease:"easeInOut"}} onClick={()=>activeTab==="diary"&&speak()}><span className="robotHead"><i/></span><span className="robotBody"/><span className="robotLegs"/></motion.button>
+    </section>
 
-  function collectMemory(memory: string) {
-    setCollectedMemories((memories) => memories.includes(memory) ? memories : [...memories, memory]);
-  }
-
-  function speakCurrentThought() {
-    if (!("speechSynthesis" in window)) return;
-    if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-      return;
-    }
-    const thought = new SpeechSynthesisUtterance(
-      "I am waiting at the Western Cwm. The valley is very bright today. I keep thinking about the blue ice behind me, and the long trail ahead. I hope today's memories arrive soon.",
-    );
-    thought.rate = 0.88;
-    thought.pitch = 1.12;
-    thought.onend = () => setIsSpeaking(false);
-    thought.onerror = () => setIsSpeaking(false);
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(thought);
-  }
-
-  const isCurrent = selectedDay.day === currentDay.day;
-
-  return (
-    <main className="shell">
-      <div className="stars" aria-hidden="true" />
-      <header className="masthead">
-        <div>
-          <p className="eyebrow">Robot Everest · Expedition 001</p>
-          <h1>Pemba&apos;s Field Journal</h1>
-        </div>
-        <div className="altitude">
-          <strong>{selectedDay.altitude.toLocaleString()} m</strong>
-          <span>Day {selectedDay.day} of 5</span>
-        </div>
-      </header>
-
-      <section className={`mountain ${lanternOn ? "lanternOn" : ""}`} aria-label="Five-day Himalayan expedition trail" onPointerMove={moveMountain}>
-        <div className="aurora" aria-hidden="true" />
-        <div className="cloud cloudOne" aria-hidden="true" />
-        <div className="cloud cloudTwo" aria-hidden="true" />
-        <div className="snow" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i key={index} />)}</div>
-        <svg className="terrainRelief" viewBox="0 0 1200 700" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="terrainBase" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#151c26" />
-              <stop offset=".48" stopColor="#505866" />
-              <stop offset="1" stopColor="#0a1019" />
-            </linearGradient>
-            <linearGradient id="snowFace" x1="0" y1="0" x2=".8" y2="1">
-              <stop offset="0" stopColor="#d3d8dc" stopOpacity=".75" />
-              <stop offset=".42" stopColor="#78818d" stopOpacity=".58" />
-              <stop offset="1" stopColor="#171e29" stopOpacity=".3" />
-            </linearGradient>
-            <filter id="softRelief"><feGaussianBlur stdDeviation="7" /></filter>
-            <filter id="routeGlow"><feGaussianBlur stdDeviation="5" /></filter>
-            <pattern id="contours" width="84" height="36" patternUnits="userSpaceOnUse" patternTransform="rotate(-7)">
-              <path d="M-20 18 Q20 -3 62 17 T146 18" fill="none" stroke="#dce5ee" strokeOpacity=".075" strokeWidth="1" />
-              <path d="M-20 28 Q20 7 62 27 T146 28" fill="none" stroke="#dce5ee" strokeOpacity=".045" strokeWidth="1" />
-            </pattern>
-          </defs>
-          <rect width="1200" height="700" fill="#070c14" />
-          <path d="M0 700V428L100 386L196 427L283 343L368 427L454 307L525 355L610 194L667 267L728 92L785 202L845 293L910 230L980 355L1066 275L1200 410V700Z" fill="#171f2b" />
-          <path d="M163 700L455 307L369 427L282 343L0 700Z" fill="#39414d" />
-          <path d="M308 700L610 194L667 267L728 92L704 312L614 450Z" fill="url(#snowFace)" />
-          <path d="M728 92L785 202L846 293L804 453L704 312Z" fill="#111822" />
-          <path d="M728 92L745 159L704 220L674 265Z" fill="#dce2e644" />
-          <path d="M560 700L704 312L728 92L803 454L930 700Z" fill="#252d38" />
-          <path d="M770 700L910 230L980 355L1066 275L1200 410V700Z" fill="#121923" />
-          <path d="M0 700V428L100 386L196 427L283 343L368 427L454 307L525 355L610 194L667 267L728 92L785 202L845 293L910 230L980 355L1066 275L1200 410V700Z" fill="url(#contours)" />
-          <ellipse cx="600" cy="650" rx="540" ry="95" fill="#02050a" opacity=".72" filter="url(#softRelief)" />
-        </svg>
-        <svg className="trail" viewBox="0 0 1000 520" role="img" aria-label="Route from Base Camp to the summit">
-          <path className="trailShadow" d="M500 495 C485 455 535 430 510 392 C484 353 541 330 526 289 C513 254 563 231 546 194 C531 162 566 137 558 102 C552 77 570 58 575 38" />
-          <path className="trailFuture" d="M500 495 C485 455 535 430 510 392 C484 353 541 330 526 289 C513 254 563 231 546 194 C531 162 566 137 558 102 C552 77 570 58 575 38" />
-          <path className="trailDone" d="M500 495 C485 455 535 430 510 392 C484 353 541 330 526 289" />
-        </svg>
-
-        <button className="pemba" type="button" aria-label="Say hello to Pemba" onClick={pokePemba}>
-          <span className="antenna" />
-          <span className="head"><i /></span>
-          <span className="body" />
-          <span className="feet" />
-          <AnimatePresence mode="wait">
-            <motion.span className="thought" key={isSpeaking ? "speaking" : pembaReaction} initial={{ opacity: 0, scale: .9, y: 5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .9 }}>
-              {isSpeaking ? "telling you what I am thinking…" : pembaReaction}
-            </motion.span>
-          </AnimatePresence>
-          {isSpeaking && <span className="voiceWaves" aria-hidden="true"><i /><i /><i /></span>}
-        </button>
-
-        <div className="memoryCharms" aria-label="Collect Pemba's trail memories">
-          {[
-            ["snowflake", "❄", "A perfectly tiny snowflake"],
-            ["footprint", "⌁", "A brave footprint"],
-            ["star", "✦", "A mountain wish"],
-          ].map(([id, icon, label]) => (
-            <button key={id} type="button" className={collectedMemories.includes(id) ? "collected" : ""} onClick={() => collectMemory(id)} aria-label={label} title={label}>
-              <span>{collectedMemories.includes(id) ? "✓" : icon}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="prayerFlags" aria-hidden="true"><i /><i /><i /><i /><i /></div>
-
-        <nav className="camps" aria-label="Expedition days">
-          {expeditionDays.map((day) => (
-            <button
-              key={day.day}
-              className={`camp camp-${day.day} ${day.status} ${selectedDay.day === day.day ? "selected" : ""}`}
-              type="button"
-              disabled={day.status === "locked"}
-              onClick={() => selectDay(day)}
-              aria-pressed={selectedDay.day === day.day}
-              aria-label={`${day.status === "complete" ? "Open diary for" : day.status === "waiting" ? "Hear Pemba's thoughts for" : "Locked"} day ${day.day}, ${day.camp}`}
-            >
-              <span className="campDot" />
-              <span className="campLabel">Day {day.day}<strong>{day.camp}</strong></span>
-            </button>
-          ))}
-        </nav>
-
-        <AnimatePresence mode="wait">
-        <motion.aside key={selectedDay.day} className={`storyCard ${isCurrent ? "currentThoughts" : "pastDiary"}`} initial={{ opacity: 0, x: 24, rotate: 2 }} animate={{ opacity: 1, x: 0, rotate: isCurrent ? .5 : -.6 }} exit={{ opacity: 0, x: 18, scale: .96 }} transition={{ type: "spring", stiffness: 220, damping: 22 }}>
-          {isCurrent ? (
-            <>
-              <p className="eyebrow">Live from the trail · Today</p>
-              <h2>{selectedDay.camp}</h2>
-              <p className="currentPrompt">Pemba is still collecting today&apos;s memories. Ask what is on its mind right now.</p>
-              <ul>{selectedDay.sherpaPlan.map((item) => <li key={item}>{item}</li>)}</ul>
-              <button type="button" onClick={speakCurrentThought} className={isSpeaking ? "speaking" : ""}>
-                <span>{isSpeaking ? "Stop Pemba" : "Hear Pemba's thoughts"}</span><span>{isSpeaking ? "■" : "▶"}</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="eyebrow">Written at {selectedDay.camp}</p>
-              <h2>{selectedDay.diary?.title}</h2>
-              <p className="diaryBody">{selectedDay.diary?.body}</p>
-              <div className="diaryNote"><span>Proud moment</span>{selectedDay.diary?.proudMoment}</div>
-              <button type="button" onClick={() => selectDay(currentDay)}><span>Return to today</span><span>↗</span></button>
-            </>
-          )}
-        </motion.aside>
-        </AnimatePresence>
-
-        <button className="lanternSwitch" type="button" onClick={() => setLanternOn((value) => !value)} aria-pressed={lanternOn}>
-          <span>{lanternOn ? "✦" : "☾"}</span>{lanternOn ? "Lantern on" : "Night mode"}
-        </button>
-
-        <div className="memoryPouch" aria-live="polite">
-          <span>Memory pouch</span><strong>{collectedMemories.length}/3</strong>
-        </div>
-      </section>
-
-      <footer className="dayRail" aria-label="Select an expedition day">
-        {expeditionDays.map((day) => (
-          <button key={day.day} type="button" className={`${day.status} ${selectedDay.day === day.day ? "selected" : ""}`} onClick={() => selectDay(day)} disabled={day.status === "locked"}>
-            <i /> Day {day.day}<small>{day.status === "complete" ? "Diary" : day.status === "waiting" ? "Today" : "Locked"}</small>
-          </button>
-        ))}
-      </footer>
-      <MemoryRadio initialDay={selectedDay.day} />
-    </main>
-  );
+    <AnimatePresence mode="wait">{activeTab==="diary"?<motion.aside key={`diary-${selectedDay.day}`} className={`contentPanel diaryPanel ${current?"livePanel":"pastPanel"}`} initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}}><div className="panelMeta"><span>{current?"TODAY · LIVE":"FIELD NOTE · ARCHIVED"}</span><b>DAY 0{selectedDay.day}</b></div><h2>{current?selectedDay.camp:selectedDay.diary?.title}</h2>{current?<><p className="lead">Today&apos;s entry is still being written. Pemba can tell you what it is thinking right now.</p><div className="plan"><span>SHERPA PLAN</span>{selectedDay.sherpaPlan.map((item,index)=><p key={item}><b>0{index+1}</b>{item}</p>)}</div><button className="primaryAction" onClick={speak}>{speaking?"STOP TRANSMISSION":"HEAR PEMBA'S THOUGHTS"}<span>{speaking?"■":"▶"}</span></button></>:<><p className="diaryText">{selectedDay.diary?.body}</p><blockquote><span>PROUD MOMENT</span>{selectedDay.diary?.proudMoment}</blockquote><button className="textAction" onClick={()=>selectDay(today)}>RETURN TO TODAY →</button></>}</motion.aside>:<motion.aside key="radio" className="contentPanel radioPanel" initial={{opacity:0,x:-20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}}><MemoryRadio initialDay={today.day} embedded/></motion.aside>}</AnimatePresence>
+    <footer className="progressFooter"><span>BASE CAMP</span><div><i style={{width:`${((selectedDay.day-1)/4)*100}%`}}/></div><strong>{selectedDay.altitude.toLocaleString()} M</strong><span>SUMMIT · 8,849 M</span></footer>
+  </main>;
 }

@@ -112,6 +112,16 @@ WEIGHT_SLOPE = 0.35
 WEIGHT_EXPOSURE = 0.40
 WEIGHT_DISTANCE = 0.25
 
+# Optional environmental context. These are transparent operational
+# thresholds, not learned weather predictions. Missing values do not invent
+# risk; non-finite values fail through the guard's unavailable fallback.
+HIGH_WIND_THRESHOLD_MPS = 15.0
+EXTREME_WIND_THRESHOLD_MPS = 25.0
+WIND_FULL_RISK_MPS = 30.0
+EXTREME_COLD_THRESHOLD_C = -20.0
+CRITICAL_COLD_THRESHOLD_C = -30.0
+COLD_FULL_RISK_C = -35.0
+
 # Base confidence for a fresh, valid, fully-populated context. Not 1.0:
 # configs/terrain/PROVENANCE.md documents this artifact as Wikipedia-
 # sourced (not survey-grade) with great-circle, not trail, distances, so
@@ -235,6 +245,32 @@ class GeographicRiskGuard:
             + WEIGHT_DISTANCE * distance_component
         )
 
+        wind_mps = mc.wind_mps
+        temperature_c = mc.temperature_c
+        wind_component = 0.0
+        cold_component = 0.0
+        if wind_mps is not None:
+            wind = float(wind_mps)
+            if not math.isfinite(wind) or wind < 0.0:
+                return _unavailable_report(mc)
+            wind_component = _clip01(wind / WIND_FULL_RISK_MPS)
+            if wind >= HIGH_WIND_THRESHOLD_MPS:
+                reasons.append(ReasonCode.ENVIRONMENT_HIGH_WIND)
+        if temperature_c is not None:
+            temperature = float(temperature_c)
+            if not math.isfinite(temperature):
+                return _unavailable_report(mc)
+            if temperature <= EXTREME_COLD_THRESHOLD_C:
+                reasons.append(ReasonCode.ENVIRONMENT_EXTREME_COLD)
+                cold_component = _clip01(
+                    (EXTREME_COLD_THRESHOLD_C - temperature)
+                    / (EXTREME_COLD_THRESHOLD_C - COLD_FULL_RISK_C)
+                )
+
+        # Environmental hazards cannot be diluted by a calm route score.
+        environment_component = max(wind_component, cold_component)
+        score = max(score, environment_component)
+
         if is_stale:
             reasons.append(ReasonCode.GEOGRAPHIC_CONTEXT_STALE)
             score = max(score, STALE_SCORE_FLOOR)
@@ -247,7 +283,11 @@ class GeographicRiskGuard:
 
         severe_combo = exposure_class == "SEVERE" and distance_m >= _SEVERE_COMBO_DISTANCE_M
         extreme_slope = slope_deg is not None and abs(slope_deg) >= EXTREME_SLOPE_THRESHOLD_DEG
-        if severe_combo or extreme_slope:
+        extreme_wind = wind_mps is not None and float(wind_mps) >= EXTREME_WIND_THRESHOLD_MPS
+        critical_cold = (
+            temperature_c is not None and float(temperature_c) <= CRITICAL_COLD_THRESHOLD_C
+        )
+        if severe_combo or extreme_slope or extreme_wind or critical_cold:
             action = GuardAction.REQUEST_HOLD
 
         if not reasons:
@@ -259,6 +299,10 @@ class GeographicRiskGuard:
             "route_segment": mc.route_segment or "",
             "exposure_class": exposure_class,
             "age_seconds": f"{age_seconds:.1f}",
+            "wind_mps": "unavailable" if wind_mps is None else f"{float(wind_mps):.2f}",
+            "temperature_c": (
+                "unavailable" if temperature_c is None else f"{float(temperature_c):.2f}"
+            ),
         }
 
         return GuardReport(

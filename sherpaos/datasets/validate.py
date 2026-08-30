@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 from pathlib import Path
 from typing import Any
@@ -45,30 +46,76 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
     split = read_json(dataset / "split_manifest.json")
     requested = int(scenario.get("episodes_requested", -1))
     contract_mode = bool(scenario.get("contract_mode", False))
-    expected = 2 if contract_mode else 200
+    qualification_mode = bool(scenario.get("qualification_mode", False))
+    expected = 2 if contract_mode else (20 if qualification_mode else 200)
     completed = scenario.get("completed", [])
     completed_ids = [row.get("episode_id") for row in completed]
     if requested != expected or len(completed_ids) != expected:
         errors.append(f"expected exactly {expected} completed episodes, got {len(completed_ids)}")
     if len(set(completed_ids)) != len(completed_ids):
         errors.append("duplicate episode IDs")
+    if not contract_mode:
+        settings = scenario.get("settings", {})
+        stress_slope_min = float(settings.get("stress_slope_min_deg", 16.0))
+        terrain_max_slope = float(settings.get("terrain_max_slope_deg", 30.0))
+        short = [row.get("episode_id") for row in completed if int(row.get("windows", 0)) < 10]
+        if short:
+            errors.append(
+                "episodes with fewer than 10 usable pre-failure windows: "
+                + ", ".join(map(str, short))
+            )
+        nominal = [row for row in completed if row.get("category") == "nominal"]
+        nominal_fall_rate = (
+            sum(bool(row.get("fell")) for row in nominal) / len(nominal) if nominal else 1.0
+        )
+        if nominal_fall_rate > 0.20:
+            errors.append(f"nominal fall rate {nominal_fall_rate:.6f} above 0.20")
+        missed_steep = [
+            row.get("episode_id")
+            for row in completed
+            if row.get("terrain_zone") == 4
+            and float(row.get("max_slope_deg", 0.0)) < stress_slope_min - 0.5
+        ]
+        if missed_steep:
+            errors.append(
+                "stress terrain scenarios never contacted a "
+                f">={stress_slope_min:g} degree segment: "
+                + ", ".join(str(value) for value in missed_steep)
+            )
+        excessive_slope = [
+            row.get("episode_id")
+            for row in completed
+            if float(row.get("max_slope_deg", 0.0)) > terrain_max_slope + 0.5
+        ]
+        if excessive_slope:
+            errors.append(
+                f"episodes exceeded {terrain_max_slope:g} degree terrain cap: "
+                + ", ".join(str(value) for value in excessive_slope)
+            )
 
     shard_size = int(scenario.get("settings", {}).get("shard_episodes", 10))
     expected_shards = math.ceil(expected / shard_size)
     observation_paths = sorted((dataset / "observations").glob("shard-*.npz"))
     label_paths = sorted((dataset / "labels").glob("shard-*.npz"))
+    context_paths = sorted((dataset / "context").glob("shard-*.npz"))
     expected_names = [f"shard-{index:03d}.npz" for index in range(expected_shards)]
     if [path.name for path in observation_paths] != expected_names:
         errors.append("missing or unexpected observation shards")
     if [path.name for path in label_paths] != expected_names:
         errors.append("missing or unexpected label shards")
+    if [path.name for path in context_paths] != expected_names:
+        errors.append("missing or unexpected context shards")
 
     mobility_parts: list[np.ndarray] = []
     dynamics_parts: list[np.ndarray] = []
+    warning_episodes: set[str] = set()
+    risk_episodes: set[str] = set()
+    observation_digests: dict[str, str] = {}
     for name in expected_names:
         observation_path = dataset / "observations" / name
         label_path = dataset / "labels" / name
-        if not observation_path.is_file() or not label_path.is_file():
+        context_path = dataset / "context" / name
+        if not observation_path.is_file() or not label_path.is_file() or not context_path.is_file():
             continue
         try:
             with (
@@ -76,8 +123,32 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
                 np.load(label_path, allow_pickle=False) as labels,
             ):
                 _validate_pair(observations, labels, errors, name)
+                with np.load(context_path, allow_pickle=False) as context:
+                    if len(context["episode_ids"]) != int(np.sum(labels["completed_steps"])):
+                        errors.append(f"context/telemetry length mismatch in {name}")
                 mobility_parts.append(np.asarray(labels["mobility_targets"]))
                 dynamics_parts.append(np.asarray(labels["dynamics_targets"]))
+                episode_ids = np.asarray(labels["episode_ids"])
+                observation_episode_ids = np.asarray(observations["episode_ids"])
+                for episode_id in np.unique(observation_episode_ids):
+                    episode_windows = observations["observations"][
+                        observation_episode_ids == episode_id
+                    ]
+                    digest = hashlib.sha256(episode_windows.tobytes()).hexdigest()
+                    previous = observation_digests.get(digest)
+                    if previous is not None:
+                        errors.append(
+                            f"duplicate observation trajectory: {previous} and {episode_id}"
+                        )
+                    observation_digests[digest] = str(episode_id)
+                risk = np.maximum(labels["mobility_targets"], labels["dynamics_targets"])
+                for episode_id in np.unique(episode_ids):
+                    values = risk[episode_ids == episode_id]
+                    if np.any(values > 0.5):
+                        risk_episodes.add(str(episode_id))
+                        first = int(np.argmax(values > 0.5))
+                        if first > 0 and np.any(values[:first] <= 0.5):
+                            warning_episodes.add(str(episode_id))
         except (OSError, ValueError, KeyError) as exc:
             errors.append(f"missing or corrupt shard {name}: {exc}")
 
@@ -89,6 +160,11 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
             errors.append(f"mobility positive rate {mobility_rate:.6f} outside [0.05, 0.80]")
         if not 0.05 <= dynamics_rate <= 0.80:
             errors.append(f"dynamics positive rate {dynamics_rate:.6f} outside [0.05, 0.80]")
+        warning_coverage = len(warning_episodes) / len(risk_episodes) if risk_episodes else 0.0
+        if warning_coverage < 0.90:
+            errors.append(f"pre-failure warning coverage {warning_coverage:.6f} below 0.90")
+    else:
+        warning_coverage = 0.0
 
     report = {
         "status": "RED" if errors else "GREEN",
@@ -97,6 +173,7 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
         "feature_width": OBSERVATION_WIDTH,
         "mobility_positive_rate": mobility_rate,
         "dynamics_positive_rate": dynamics_rate,
+        "pre_failure_warning_coverage": warning_coverage,
         "errors": errors,
     }
     if errors:

@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from sherpaos.contracts import RobotTelemetry
-from sherpaos.datasets.generate import generate_dataset
-from sherpaos.datasets.manifest import write_checksums
+from sherpaos.datasets.generate import _command_for, _wind_for, generate_dataset
+from sherpaos.datasets.manifest import read_json, write_checksums
 from sherpaos.datasets.split import build_split_manifest
 from sherpaos.datasets.validate import DatasetValidationError, validate_dataset
 from sherpaos.evaluation.ground_truth import ScenarioGroundTruth
@@ -80,6 +80,12 @@ def test_deterministic_generation_and_observation_label_separation(
     with np.load(first / "labels/shard-000.npz", allow_pickle=False) as labels:
         assert "mobility_targets" in labels.files
         assert set(labels["completed_episode_ids"]) == {"episode-000", "episode-050"}
+    with np.load(first / "context/shard-000.npz", allow_pickle=False) as context:
+        assert "current_wind_mps" in context.files
+        assert "forecast_wind_mps" in context.files
+        assert "geographic_go_no_go_label" in context.files
+        assert np.array_equal(context["wind_mps"], context["current_wind_mps"])
+        assert np.all(context["forecast_wind_mps"] >= 0.0)
     assert validate_dataset(first)["status"] == "GREEN"
 
 
@@ -110,6 +116,26 @@ def test_group_split_isolation(
         assert split == manifest["groups"][f"{category}-group-00"]
 
 
+def test_production_conditions_are_deterministically_diverse() -> None:
+    commands = [_command_for(index) for index in range(50)]
+    nominal_winds = [_wind_for("nominal", index) for index in range(50)]
+    assert len(set(commands)) == 50
+    assert len(set(nominal_winds)) > 10
+    assert max(nominal_winds) <= 8.65
+    assert _wind_for("combined", 4) == 55.6
+    assert _wind_for("combined", 44) == 55.6
+
+
+def test_qualification_spans_full_category_range(matrix_path: Path) -> None:
+    from sherpaos.datasets.generate import episode_specs, load_matrix
+
+    specs = episode_specs(load_matrix(matrix_path), 20)
+    for category in ("nominal", "mobility", "dynamics", "combined"):
+        indices = [row["category_index"] for row in specs if row["category"] == category]
+        assert indices == [5, 27, 38, 46, 49]
+        assert {index % 5 for index in indices} == {0, 1, 2, 3, 4}
+
+
 def test_resumability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_path: Path) -> None:
     calls = 0
 
@@ -122,8 +148,14 @@ def test_resumability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_pa
     output = tmp_path / "resume"
     generate_dataset(matrix_path, 2, output)
     assert calls == 2
+    first_manifest = read_json(output / "scenario_manifest.json")
     generate_dataset(matrix_path, 2, output)
     assert calls == 2
+    resumed_manifest = read_json(output / "scenario_manifest.json")
+    assert resumed_manifest["completed"] == first_manifest["completed"]
+    assert all(
+        "terrain_zone" in row and "max_slope_deg" in row for row in resumed_manifest["completed"]
+    )
 
 
 def test_checksum_corruption_detection(
@@ -136,4 +168,39 @@ def test_checksum_corruption_detection(
     with path.open("ab") as handle:
         handle.write(b"corrupt")
     with pytest.raises(DatasetValidationError, match="checksum mismatch"):
+        validate_dataset(output)
+
+
+def test_duplicate_observation_trajectory_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_path: Path
+) -> None:
+    monkeypatch.setattr("sherpaos.datasets.generate.run_episode", _fake_episode)
+    output = tmp_path / "duplicate-trajectory"
+    generate_dataset(matrix_path, 2, output)
+    path = output / "observations/shard-000.npz"
+    with np.load(path, allow_pickle=False) as artifact:
+        values = {key: artifact[key] for key in artifact.files}
+    ids = values["episode_ids"]
+    first = values["observations"][ids == "episode-000"]
+    values["observations"][ids == "episode-050"] = first
+    np.savez_compressed(path, **values)
+    write_checksums(output)
+    with pytest.raises(DatasetValidationError, match="duplicate observation trajectory"):
+        validate_dataset(output)
+
+
+def test_validation_rejects_episode_without_pre_failure_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_path: Path
+) -> None:
+    monkeypatch.setattr("sherpaos.datasets.generate.run_episode", _fake_episode)
+    output = tmp_path / "short"
+    generate_dataset(matrix_path, 20, output)
+    manifest_path = output / "scenario_manifest.json"
+    import json
+
+    manifest = json.loads(manifest_path.read_text())
+    manifest["completed"][0]["windows"] = 0
+    manifest_path.write_text(json.dumps(manifest))
+    write_checksums(output)
+    with pytest.raises(DatasetValidationError, match="fewer than 10 usable"):
         validate_dataset(output)

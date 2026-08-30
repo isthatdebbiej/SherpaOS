@@ -1,12 +1,19 @@
 # STATUS.md — current state
 
-**Last updated:** 2026-08-29 PT
+**Last updated:** 2026-08-30 PT
 **Base SHA:** `f8562169` (dataset-pipeline implementation base)
 **Working tree:** uncommitted dataset, expedition-memory, Field Journal, and documentation work
 **Latest Python verification on record:** Ruff green; full pytest suite green (150 passed); 2-episode dataset contract GREEN
 **Latest web verification:** Next.js 16.3.3 production build GREEN after the animated trail redesign
 
 ## Implemented
+
+- Deterministic-guard hardening: telemetry health now rejects materially future-dated
+  samples; geographic/environment risk now scores optional wind and ambient temperature,
+  with explicit high-wind/extreme-cold reasons and severe-condition hold overrides.
+- Added `docs/RISK_DATA_REQUIREMENTS.md` covering inputs for guards 3/4/5, the depth-input
+  boundary, the 200-episode training flow, video purpose, generation quality gates, and
+  the separate five-day expedition temporal-readiness contract.
 
 - Real expedition-memory vertical slice: immutable per-day `.mcap`/rosbag2 `.db3`
   upload, streaming SHA-256, read-only bag inspection, topic/message/time coverage,
@@ -111,6 +118,10 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 - rosbag2 SQLite inspection works without a ROS runtime. MCAP inspection uses the locked
   `mcap` expedition extra. Full message decoding/time-series Parquet derivation remains
   the next backend slice.
+- Five-day temporal readiness is not yet complete: manifests retain nanosecond topic
+  ranges, but calendar date/time zone, decoded common-clock rows, gap/rate/overlap audits,
+  and evidence-linked event intervals still need implementation before grounded daily
+  reflection can use hours of telemetry.
 - Full pytest suite and Ruff are green; the Next.js production build is green.
 - Live voice was not called during verification because no API credential was supplied.
 
@@ -175,3 +186,12 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 - Added its exact 240-input/12-action controller and full Menagerie G1 renderer.
 - Added a segmentation visibility gate so an occluded G1 cannot pass.
 - See docs/V26_HIMALAYA_PLAYGROUND.md for teammate commands.
+
+## v6q multi-grade terrain qualification (2026-08-30 PT)
+
+- Replaced the single synthetic incline with four connected collision segments per terrain family. Authored profiles cover nominal 2-5 degrees, icy mobility 5-12 degrees, snow crust 4-10 degrees, rocky snow 5-13 degrees, and a progressive steep boundary of 10/16/22/30 degrees.
+- Privileged slope truth now comes from the exact terrain geom contacting a foot. Qualification fails if the steep scenario does not physically reach at least 16 degrees.
+- The validated 20-episode v6q pilot completed 20/20 episodes with 103 input features, 9.96% mobility positives, 13.07% dynamics positives, and zero validation errors.
+- Episode 053 physically contacted 10- and 16-degree ice segments before falling at step 477. The authored 22- and 30-degree sections were not contacted and are not claimed as training exposure.
+- Source manifests now record the clean Git SHA, exact source/config hashes, and frozen locomotion-policy hash before the 200-episode production run.
+- The second production cohort uses a separately versioned 10-15 degree stress envelope. Its connected steep-ice profile is 10/12/15/15 degrees, validation requires physical contact at 15 degrees, and no episode may exceed the configured 15-degree terrain cap.
