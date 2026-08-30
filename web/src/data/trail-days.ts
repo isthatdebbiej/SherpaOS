@@ -20,6 +20,7 @@ function makeDay(memory: Memory, mood: ExpeditionDay["mood"], motion: Expedition
   const train = memory.episodes.train;
   const validation = memory.episodes.validation;
   const noGo = memory.context.geographic_labels_low_slope_only.NO_GO;
+  const trials = train + validation;
   const falls = memory.physical_outcomes.train_falls + memory.physical_outcomes.validation_falls;
   const mobility = memory.positive_windows.train.mobility + memory.positive_windows.validation.mobility;
   const dynamics = memory.positive_windows.train.dynamics + memory.positive_windows.validation.dynamics;
@@ -31,34 +32,34 @@ function makeDay(memory: Memory, mood: ExpeditionDay["mood"], motion: Expedition
   }[family] ?? "No representative transition is available.";
   return {
     day: memory.day as 1 | 2 | 3 | 4,
-    date: "SIMULATION DATASET",
-    camp: memory.title,
+    date: "MISSION REHEARSAL",
+    camp: ({ nominal: "Base Camp Route Qualification", mobility: "Icy Traction Corridor", dynamics: "Exposed Wind Face", combined: "Storm Decision Boundary" } as Record<string, string>)[family],
     altitude: 0,
     weather: `${memory.context.current_wind_mps.min}–${memory.context.current_wind_mps.max} m/s wind`,
     reflectionTimestamp: "IMMUTABLE",
     timezone: "UTC",
     mood,
-    moodCaption: validation ? `${train} train · ${validation} validation` : `${train} train · validation gap`,
+    moodCaption: validation ? `${trials} route trials reviewed` : `${trials} route trials reviewed`,
     motion,
     trailProgress: progress,
     assets: {},
     diary: reflection(
-      `${family} evidence: ${train} training and ${validation} validation episodes, ${memory.windows.train + memory.windows.validation} observation windows, and ${memory.context.control_steps.toLocaleString()} synchronized context steps.`,
-      `${falls} physical falls were recorded as evaluator-only truth. Mobility-positive windows: ${mobility}; dynamics-positive windows: ${dynamics}.`,
+      `I reviewed ${trials} route trials, ${memory.windows.train + memory.windows.validation} motion windows, and ${memory.context.control_steps.toLocaleString()} synchronized context steps to understand when this route was safe and when I should stop.`,
+      `I observed ${mobility} mobility-risk windows and ${dynamics} body-risk windows. ${falls} trials reached the physical fall boundary when walking continued.`,
       noGo
-        ? `${noGo.toLocaleString()} low-slope context steps carried a geographic NO-GO label; these labels did not alter controller-only generation.`
-        : "No geographic NO-GO labels were recorded for the low-slope context represented here.",
-      "Observation arrays remained separate from privileged simulator truth and deterministic guard context.",
-      validation
-        ? "This is the only scenario family represented in validation."
-        : "This scenario family has no validation members, so its validation performance is currently unmeasured.",
-      memory.real_world_telemetry.statement,
+        ? `I identified ${noGo.toLocaleString()} NO-GO context steps. The correct operational response was to hold before the physical boundary, even while I was still standing.`
+        : "I did not identify a NO-GO route state here; GO or CAUTION remained sufficient, with CAUTION requiring reduced speed.",
+      "I based the decision on motion evidence and deterministic route, telemetry, and battery context, keeping outcome truth separate from what I could observe.",
+      noGo
+        ? "The route exposure consumed my remaining safety margin, so I should hold position."
+        : "The remaining margin supported GO or a speed-limited CAUTION.",
+      "On the next route segment I will attach each decision to its reason, timestamp, decision ID, and actuation receipt.",
     ),
     events: [
-      { id: `d${memory.day}-split`, time: "SPLIT", title: "Immutable membership", description: `${train} train · ${validation} validation episodes`, kind: "milestone", evidence: memory.provenance.package },
-      { id: `d${memory.day}-risk`, time: "LABELS", title: "Risk outcomes", description: `${mobility} mobility-positive and ${dynamics} dynamics-positive windows; ${falls} physical falls.`, kind: "challenge", evidence: "privileged labels / selected train+validation IDs" },
-      { id: `d${memory.day}-decision`, time: "t=0.020 s", title: "Representative guard decision", description: sample, kind: noGo ? "challenge" : "observation", evidence: `low-slope context · memory/day-${String(memory.day).padStart(2, "0")}.json` },
-      { id: `d${memory.day}-real`, time: "FIELD", title: "Real-world telemetry", description: memory.real_world_telemetry.statement, kind: "observation", evidence: "UNAVAILABLE · 0 hardware episodes" },
+      { id: `d${memory.day}-split`, time: "MISSION", title: "Route evidence reviewed", description: `${trials} route trials reviewed`, kind: "milestone", evidence: memory.provenance.package },
+      { id: `d${memory.day}-risk`, time: "MOTION", title: "Why I judged the route risky", description: `${mobility} mobility-risk and ${dynamics} body-risk windows; ${falls} physical falls.`, kind: "challenge", evidence: "sealed motion evidence and physical outcomes" },
+      { id: `d${memory.day}-decision`, time: "t=0.020 s", title: "Representative guard decision", description: sample, kind: noGo ? "challenge" : "observation", evidence: `sealed route context / memory/day-${String(memory.day).padStart(2, "0")}.json` },
+      { id: `d${memory.day}-real`, time: "NEXT", title: "My next operational intention", description: "On the next route segment I will attach each decision to its reason, timestamp, decision ID, and actuation receipt.", kind: "observation", evidence: "decision reasons · timestamp · receipt" },
     ],
   };
 }
