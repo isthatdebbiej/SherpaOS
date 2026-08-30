@@ -120,6 +120,31 @@ export function LiveSafetyDemo() {
   const [event, setEvent] = useState<Event | null>(null);
   const [connected, setConnected] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const receive = (value: Event) => {
+      setEvent(value);
+      setEvents(items => items[0]?.decision.decision_id === value.decision.decision_id
+        ? items
+        : [value, ...items].slice(0, 8));
+    };
+    const poll = async () => {
+      try {
+        const response = await fetch("/api/supervisor/current", { cache: "no-store" });
+        if (!response.ok) throw new Error(`evidence HTTP ${response.status}`);
+        receive(await response.json() as Event);
+        if (!cancelled) setConnected(true);
+      } catch {
+        if (!cancelled) setConnected(false);
+      }
+    };
+    void poll();
+    const poller = setInterval(() => void poll(), 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(poller);
+    };
+  }, []);
   const guards = useMemo(() => event?.decision.guard_reports ?? [], [event]);
   const verdict = event ? actionLabel[event.decision.action] : "NO LIVE EVIDENCE";
 
