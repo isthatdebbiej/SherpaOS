@@ -17,7 +17,7 @@ TERRAIN_ZONE_PROFILES = (
     (5.0, 8.0, 12.0, 9.0),
     (4.0, 7.0, 10.0, 6.0),
     (5.0, 9.0, 13.0, 8.0),
-    (8.0, 10.0, 12.0, 15.0),
+    (10.0, 12.0, 15.0, 15.0),
 )
 TERRAIN_ZONE_SLOPE_DEG = tuple(max(profile) for profile in TERRAIN_ZONE_PROFILES)
 TERRAIN_ZONE_LENGTHS_M = (
@@ -25,7 +25,7 @@ TERRAIN_ZONE_LENGTHS_M = (
     (1.125, 1.125, 1.125, 1.125),
     (1.125, 1.125, 1.125, 1.125),
     (1.125, 1.125, 1.125, 1.125),
-    (0.65, 0.90, 1.30, 2.65),
+    (0.20, 0.30, 1.00, 4.00),
 )
 TERRAIN_GRID_SIZE = 129
 TERRAIN_HALF_X_M = 6.0
