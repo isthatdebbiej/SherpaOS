@@ -21,6 +21,7 @@ artifacts/playground/
 artifacts/datasets/*.tar.gz
 artifacts/incidents/*.json
 !artifacts/incidents/.gitkeep
+artifacts/emotion_journey/
 *.npz
 var/
 .DS_Store

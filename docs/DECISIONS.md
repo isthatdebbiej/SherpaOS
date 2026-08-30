@@ -172,3 +172,34 @@ runs (cause not yet root-caused); `beyondmimic` repeatedly falls and is not demo
 `kungfu2` has a bundled ONNX but no reachable FSM trigger in this fork and was excluded
 rather than mis-wired.
 
+## 2026-08-30 — Emotion-expression lane (`sherpaos/emotion/`) is presentation-only, downstream of the guard runtime
+
+Added `sherpaos/emotion/mapping.py` (`classify_emotion`) and `sherpaos/emotion/
+gestures.py` (`should_gesture`) plus `scripts/himalaya_emotion_journey.py`, which
+simulates the full 8-waypoint Everest Base Camp route (one short MuJoCo episode per
+waypoint, difficulty scaled from that waypoint's own `exposure_class`/
+`slope_deg_from_prev`) and derives a named emotion (`CALM`/`JOY`/`RELIEF`/`WORRY`/
+`FEAR`/`UNCERTAIN`) from each leg's final `GuardDecision`.
+
+This is deliberately a one-way, read-only consumer of the existing safety runtime, the
+same boundary the Field Journal (`web/`) already has with incident evidence:
+`sherpaos.emotion` imports only `sherpaos.contracts` and is never imported by
+`sherpaos.policy`, `sherpaos.estimator`, or the sim/runner control loop. Nothing here
+changes a `GuardDecision`, a requested speed limit, or a hold — it only reads a
+decision that has already been finalized.
+
+Mapping is fixed-threshold and deterministic (no learned model, per AGENTS.md rule 6),
+reusing `policy/state_machine.py`'s own score bands so an emotion can never disagree
+with what the safety policy just decided about the same sample: `REQUEST_HOLD` ->
+FEAR, `LIMIT_SPEED` -> WORRY, low-confidence `PASS` -> UNCERTAIN (never rendered as
+calm), a `PASS` recovering from a recent non-PASS -> RELIEF, a `PASS` at a named
+waypoint -> JOY, otherwise CALM.
+
+Gesture-triggering is intentionally narrow: `gestures.py` only ever proposes one of
+the three FSMDeployG1 skills `docs/G1_DANCE_DEMO.md` records as repeatedly ending
+standing (`dance` for JOY, `kick` for RELIEF) — never `beyondmimic` (unstable) or
+`kungfu2` (no FSM trigger) — and `should_gesture` additionally requires the caller to
+vouch the mobility guard is currently PASS-ing before proposing anything. The script
+only *recommends* a gesture by default; `--run-gestures` is required to actually
+invoke `scripts/run_g1_dance.py`.
+

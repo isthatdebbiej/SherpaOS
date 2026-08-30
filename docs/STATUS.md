@@ -151,3 +151,23 @@ Git commands in evidence generation now pass the repository as an explicit safe 
   tilt < ~7 deg) through tens of thousands of control steps and repeated
   velocity/turn commands. Same pinned v26 ONNX and checksum, no new
   third-party dependency.
+
+## Emotion-expression lane (2026-08-30 PT)
+
+- Added `sherpaos/emotion/` (`mapping.py`: `classify_emotion`; `gestures.py`:
+  `should_gesture`) and `scripts/himalaya_emotion_journey.py`. Presentation-only,
+  downstream consumer of `GuardDecision` -- see `docs/DECISIONS.md` for the full
+  boundary rationale.
+- Verified: `uv run pytest tests/unit/test_emotion.py` — 20/20 passed (label mapping
+  per action band, intensity always bounded/finite, malformed-input fallback,
+  gesture gating to the verified-stable skill set + mobility-ok gate).
+- Verified end to end: `uv run python scripts/himalaya_emotion_journey.py
+  --steps-per-leg 300` — ran all 8 Everest Base Camp waypoints, difficulty
+  genuinely tracked terrain (JOY/dance-recommended on the LOW-exposure lower
+  legs, WORRY as MODERATE-exposure legs triggered LIMIT_SPEED, FEAR at Everest
+  Base Camp's SEVERE exposure triggering REQUEST_HOLD), wrote
+  `artifacts/emotion_journey/himalaya_journey.json` (gitignored).
+- Full repo gate re-run after this change: `ruff check .` green, `pytest -n auto`
+  green (full suite, no regressions).
+- Not yet done: `--run-gestures` (actually triggering `scripts/run_g1_dance.py` per
+  leg) exercised only via code review, not a live run in this checkpoint.
