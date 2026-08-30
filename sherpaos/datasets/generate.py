@@ -78,7 +78,7 @@ def episode_specs(matrix: dict[str, Any], episodes: int) -> list[dict[str, Any]]
     if episodes == 2:
         return [full[0], full[50]]
     if episodes == 20:
-        qualification_indices = (0, 16, 27, 38, 49)
+        qualification_indices = (5, 27, 38, 46, 49)
         return [
             full[start + index] for start in (0, 50, 100, 150) for index in qualification_indices
         ]
@@ -138,13 +138,13 @@ def _command_for(category_index: int) -> tuple[float, float, float]:
     """Matched command families shared by every category."""
     base = (
         (0.25, 0.0, 0.0),
-        (0.40, 0.0, 0.0),
+        (0.36, 0.0, 0.0),
         (0.30, 0.0, 0.10),
         (0.30, 0.0, 0.0),
         (0.35, 0.0, -0.05),
     )[category_index % 5]
     group = category_index // 5
-    speed_delta = (group - 4.5) * 0.004
+    speed_delta = (group - 4.5) * 0.002
     yaw_delta = ((group % 3) - 1) * 0.003
     return (base[0] + speed_delta + 0.01, base[1], base[2] + yaw_delta)
 
