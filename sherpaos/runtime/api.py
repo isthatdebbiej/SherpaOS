@@ -6,11 +6,14 @@ import asyncio
 import base64
 import json
 import os
+import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from sherpaos.runtime.live import live_evidence
 
@@ -45,6 +48,55 @@ def events(limit: int = 100) -> list[dict[str, object]]:
     return live_evidence.history(min(500, max(1, limit)))
 
 
+def _robot_mjpeg(source: Path) -> Iterator[bytes]:
+    """Transcode a verified robot recording into a browser-safe MJPEG feed."""
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-re",
+        "-stream_loop",
+        "-1",
+        "-i",
+        str(source),
+        "-an",
+        "-vf",
+        "fps=10,scale=960:-2",
+        "-q:v",
+        "5",
+        "-f",
+        "mpjpeg",
+        "-boundary_tag",
+        "frame",
+        "pipe:1",
+    ]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    try:
+        if process.stdout is None:
+            return
+        while chunk := process.stdout.read(64 * 1024):
+            yield chunk
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+
+@app.get("/stream/robot")
+def robot_stream() -> StreamingResponse:
+    source = Path(os.environ.get("SHERPA_ROBOT_STREAM_VIDEO", "artifacts/live/robot.mp4"))
+    if not source.is_file():
+        raise HTTPException(503, "robot stream source is unavailable")
+    return StreamingResponse(
+        _robot_mjpeg(source),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
+
+
 def _memory(day: int) -> dict[str, object]:
     if day not in range(1, 5):
         raise HTTPException(404, "journal memory is available only for days 1-4")
@@ -70,12 +122,8 @@ def _radio_evidence(day: int) -> dict[str, object]:
         "mobility_risk_windows": (
             positives["train"]["mobility"] + positives["validation"]["mobility"]
         ),
-        "body_risk_windows": (
-            positives["train"]["dynamics"] + positives["validation"]["dynamics"]
-        ),
-        "physical_boundary_outcomes": (
-            outcomes["train_falls"] + outcomes["validation_falls"]
-        ),
+        "body_risk_windows": (positives["train"]["dynamics"] + positives["validation"]["dynamics"]),
+        "physical_boundary_outcomes": (outcomes["train_falls"] + outcomes["validation_falls"]),
         "guard_context": memory["context"],
         "latest_live_decision": live_evidence.current(),
     }
@@ -179,6 +227,7 @@ def _synthesize_speech(text: str) -> bytes:
     output = io.BytesIO()
     wavfile.write(output, int(_TTS_MODEL.config.sampling_rate), pcm)
     return output.getvalue()
+
 
 @app.websocket("/ws/supervisor")
 async def socket(websocket: WebSocket) -> None:
