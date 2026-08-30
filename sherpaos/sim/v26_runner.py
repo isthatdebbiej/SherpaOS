@@ -40,6 +40,9 @@ TERRAIN_GEOMS = (
 )
 LEFT_FOOT_BODY = "left_ankle_roll_link"
 RIGHT_FOOT_BODY = "right_ankle_roll_link"
+HAZARD_ONSET_STEP = 125
+HAZARD_RAMP_STEPS = 75
+BASELINE_FRICTION = 0.90
 
 
 def run_v26_episode(
@@ -80,16 +83,15 @@ def run_v26_episode(
         model.actuator_biasprm[aid, 2] = -KD[index]
     terrain_ids = {_geom_id(model, name) for name in TERRAIN_GEOMS}
     terrain_ids.discard(-1)
-    if scenario.friction < 0.99:
-        for geom_id in terrain_ids:
-            model.geom_friction[geom_id, 0] = scenario.friction
+    initial_friction = max(scenario.friction, BASELINE_FRICTION)
+    for geom_id in terrain_ids:
+        model.geom_friction[geom_id, 0] = initial_friction
     mujoco.mj_forward(model, data)
     pelvis = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
     feet = (_body_geoms(model, LEFT_FOOT_BODY), _body_geoms(model, RIGHT_FOOT_BODY))
-    if scenario.friction < 0.99:
-        for foot_geoms in feet:
-            for geom_id in foot_geoms:
-                model.geom_friction[geom_id, 0] = scenario.friction
+    for foot_geoms in feet:
+        for geom_id in foot_geoms:
+            model.geom_friction[geom_id, 0] = initial_friction
     session = ort.InferenceSession(str(policy_path), providers=["CPUExecutionProvider"])
     if session.get_inputs()[0].shape[-1] != 240 or session.get_outputs()[0].shape[-1] != 12:
         raise ValueError("unexpected v26 ONNX input/output contract")
@@ -100,6 +102,16 @@ def run_v26_episode(
     fell = False
     noise_rng = np.random.default_rng(seed)
     for step in range(max_steps):
+        friction_phase = np.clip((step - HAZARD_ONSET_STEP) / HAZARD_RAMP_STEPS, 0.0, 1.0)
+        friction_phase = friction_phase * friction_phase * (3.0 - 2.0 * friction_phase)
+        effective_friction = initial_friction + friction_phase * (
+            scenario.friction - initial_friction
+        )
+        for geom_id in terrain_ids:
+            model.geom_friction[geom_id, 0] = effective_friction
+        for foot_geoms in feet:
+            for geom_id in foot_geoms:
+                model.geom_friction[geom_id, 0] = effective_friction
         health = 1.0
         if target_health < 1.0 and step >= 200:
             alpha = min(1.0, (step - 200) / 50.0)

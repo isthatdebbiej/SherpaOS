@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 from dataclasses import asdict, replace
@@ -41,6 +42,7 @@ PROVENANCE_FILES = (
     "sherpaos/sim/weather.py",
 )
 LABEL_RULE_VERSION = "risk-horizon-v4-causal-fall"
+SHARD_SCHEMA_VERSION = 2
 
 
 def load_matrix(path: Path) -> dict[str, Any]:
@@ -82,7 +84,7 @@ def episode_specs(matrix: dict[str, Any], episodes: int) -> list[dict[str, Any]]
 
 def scenario_for(category: str, seed: int) -> Scenario:
     if category == "nominal":
-        return replace(nominal_scenario(seed), friction=0.65)
+        return replace(nominal_scenario(seed), friction=0.90)
     rng = np.random.default_rng(seed)
     variant = seed % 5
     friction = (
@@ -326,6 +328,7 @@ def _valid_existing_shard(
                 and obs["observations"].shape[2] == OBSERVATION_WIDTH
                 and np.all(np.isfinite(obs["observations"]))
                 and set(labels["completed_episode_ids"].tolist()) == expected
+                and int(labels["shard_schema_version"]) == SHARD_SCHEMA_VERSION
                 and len(obs["episode_ids"]) == len(labels["episode_ids"])
                 and len(context["episode_ids"]) == int(np.sum(labels["completed_steps"]))
             )
@@ -338,9 +341,41 @@ def _episode_rows_from_label(path: Path, specs: list[dict[str, Any]]) -> list[di
         steps = labels["completed_steps"].tolist()
         falls = labels["episode_fell"].tolist()
         windows = labels["episode_window_counts"].tolist()
+        max_slip = labels["episode_max_slip_mps"].tolist()
+        max_tilt = labels["episode_max_tilt_deg"].tolist()
+        max_slope = labels["episode_max_slope_deg"].tolist()
+        unsafe_steps = labels["episode_unsafe_steps"].tolist()
+        terrain_zones = labels["episode_terrain_zone"].tolist()
+        winds = labels["episode_wind_target_mps"].tolist()
+        scenarios = [json.loads(value) for value in labels["episode_scenario_json"].tolist()]
     return [
-        {**spec, "steps_completed": int(step), "fell": bool(fell), "windows": int(count)}
-        for spec, step, fell, count in zip(specs, steps, falls, windows, strict=True)
+        {
+            **spec,
+            "steps_completed": int(step),
+            "fell": bool(fell),
+            "windows": int(count),
+            "max_slip_mps": float(slip),
+            "max_tilt_deg": float(tilt),
+            "max_slope_deg": float(slope),
+            "unsafe_steps": int(unsafe),
+            "terrain_zone": int(zone),
+            "wind_target_mps": float(wind),
+            "scenario": scenario,
+        }
+        for spec, step, fell, count, slip, tilt, slope, unsafe, zone, wind, scenario in zip(
+            specs,
+            steps,
+            falls,
+            windows,
+            max_slip,
+            max_tilt,
+            max_slope,
+            unsafe_steps,
+            terrain_zones,
+            winds,
+            scenarios,
+            strict=True,
+        )
     ]
 
 
@@ -368,6 +403,7 @@ def _write_shard(
     )
     np.savez_compressed(
         label_tmp,
+        shard_schema_version=np.asarray(SHARD_SCHEMA_VERSION, dtype=np.int32),
         mobility_targets=combine("mobility_targets"),
         dynamics_targets=combine("dynamics_targets"),
         fall_targets=combine("fall_targets"),
@@ -377,6 +413,17 @@ def _write_shard(
         completed_steps=np.asarray([row["steps_completed"] for row in rows], dtype=np.int32),
         episode_fell=np.asarray([row["fell"] for row in rows], dtype=np.bool_),
         episode_window_counts=np.asarray([row["windows"] for row in rows], dtype=np.int32),
+        episode_max_slip_mps=np.asarray([row["max_slip_mps"] for row in rows], dtype=np.float32),
+        episode_max_tilt_deg=np.asarray([row["max_tilt_deg"] for row in rows], dtype=np.float32),
+        episode_max_slope_deg=np.asarray([row["max_slope_deg"] for row in rows], dtype=np.float32),
+        episode_unsafe_steps=np.asarray([row["unsafe_steps"] for row in rows], dtype=np.int32),
+        episode_terrain_zone=np.asarray([row["terrain_zone"] for row in rows], dtype=np.int8),
+        episode_wind_target_mps=np.asarray(
+            [row["wind_target_mps"] for row in rows], dtype=np.float32
+        ),
+        episode_scenario_json=np.asarray(
+            [json.dumps(row["scenario"], sort_keys=True) for row in rows], dtype=str
+        ),
         truth_episode_ids=np.concatenate(
             [
                 np.repeat(row["episode_id"], len(trace))

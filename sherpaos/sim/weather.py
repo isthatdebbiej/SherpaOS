@@ -9,24 +9,28 @@ G1_DRAG_COEFFICIENT = 1.10
 G1_FRONTAL_AREA_M2 = 0.60
 EXTREME_STORM_MPS = 50.0
 EPISODE_STEPS = 500
+HAZARD_ONSET_STEP = 125
 
 
 def wind_speed_at_step(control_step: int, target_mps: float) -> float:
     """Return a temporally smooth wind trace for one independent episode.
 
-    Ordinary regimes begin at 70% of their target and evolve with a
-    smoothstep trend plus a low-frequency, bounded gust. Extreme regimes
-    begin already inside a sustained storm; they never fake a 200 km/h
-    onset inside a ten-second rollout.
+    The rollout begins with a stable but non-zero Himalayan baseline. After
+    2.5 seconds the wind evolves continuously toward the target, giving the
+    risk model a causal pre-hazard observation period without an unphysical
+    one-step jump. Extreme targets therefore represent a storm front, not an
+    instantaneous change from city wind to 200 km/h.
     """
     target = max(0.0, float(target_mps))
     if target == 0.0:
         return 0.0
-    if target >= EXTREME_STORM_MPS:
-        return target
-    phase = min(1.0, max(0.0, control_step / (EPISODE_STEPS - 1)))
+    initial_fraction = 0.25 if target >= EXTREME_STORM_MPS else 0.70
+    initial = initial_fraction * target
+    phase = min(
+        1.0,
+        max(0.0, (control_step - HAZARD_ONSET_STEP) / (EPISODE_STEPS - HAZARD_ONSET_STEP - 1)),
+    )
     smooth = phase * phase * (3.0 - 2.0 * phase)
-    initial = 0.70 * target
     trend = initial + smooth * (target - initial)
     gust = 0.03 * target * math.sin(control_step * 0.010)
     return max(0.0, trend + gust)

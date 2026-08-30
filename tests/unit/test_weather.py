@@ -18,7 +18,7 @@ class _Response:
 
 
 def test_open_meteo_weather_extracts_current_conditions(monkeypatch):
-    payload = b'''{
+    payload = b"""{
         "elevation": 5315,
         "current": {
             "time": "2026-08-29T12:00",
@@ -27,7 +27,7 @@ def test_open_meteo_weather_extracts_current_conditions(monkeypatch):
             "relative_humidity_2m": 93,
             "wind_speed_10m": 3.1
         }
-    }'''
+    }"""
     monkeypatch.setattr("sherpaos.weather.urlopen", lambda *_args, **_kwargs: _Response(payload))
 
     weather = fetch_open_meteo_current_weather(28.00722, 86.85944)

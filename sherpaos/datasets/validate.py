@@ -54,6 +54,18 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
     if len(set(completed_ids)) != len(completed_ids):
         errors.append("duplicate episode IDs")
     if not contract_mode:
+        short = [row.get("episode_id") for row in completed if int(row.get("windows", 0)) < 10]
+        if short:
+            errors.append(
+                "episodes with fewer than 10 usable pre-failure windows: "
+                + ", ".join(map(str, short))
+            )
+        nominal = [row for row in completed if row.get("category") == "nominal"]
+        nominal_fall_rate = (
+            sum(bool(row.get("fell")) for row in nominal) / len(nominal) if nominal else 1.0
+        )
+        if nominal_fall_rate > 0.20:
+            errors.append(f"nominal fall rate {nominal_fall_rate:.6f} above 0.20")
         missed_steep = [
             row.get("episode_id")
             for row in completed
@@ -80,6 +92,8 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
 
     mobility_parts: list[np.ndarray] = []
     dynamics_parts: list[np.ndarray] = []
+    warning_episodes: set[str] = set()
+    risk_episodes: set[str] = set()
     for name in expected_names:
         observation_path = dataset / "observations" / name
         label_path = dataset / "labels" / name
@@ -97,6 +111,15 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
                         errors.append(f"context/telemetry length mismatch in {name}")
                 mobility_parts.append(np.asarray(labels["mobility_targets"]))
                 dynamics_parts.append(np.asarray(labels["dynamics_targets"]))
+                episode_ids = np.asarray(labels["episode_ids"])
+                risk = np.maximum(labels["mobility_targets"], labels["dynamics_targets"])
+                for episode_id in np.unique(episode_ids):
+                    values = risk[episode_ids == episode_id]
+                    if np.any(values > 0.5):
+                        risk_episodes.add(str(episode_id))
+                        first = int(np.argmax(values > 0.5))
+                        if first > 0 and np.any(values[:first] <= 0.5):
+                            warning_episodes.add(str(episode_id))
         except (OSError, ValueError, KeyError) as exc:
             errors.append(f"missing or corrupt shard {name}: {exc}")
 
@@ -108,6 +131,11 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
             errors.append(f"mobility positive rate {mobility_rate:.6f} outside [0.05, 0.80]")
         if not 0.05 <= dynamics_rate <= 0.80:
             errors.append(f"dynamics positive rate {dynamics_rate:.6f} outside [0.05, 0.80]")
+        warning_coverage = len(warning_episodes) / len(risk_episodes) if risk_episodes else 0.0
+        if warning_coverage < 0.90:
+            errors.append(f"pre-failure warning coverage {warning_coverage:.6f} below 0.90")
+    else:
+        warning_coverage = 0.0
 
     report = {
         "status": "RED" if errors else "GREEN",
@@ -116,6 +144,7 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
         "feature_width": OBSERVATION_WIDTH,
         "mobility_positive_rate": mobility_rate,
         "dynamics_positive_rate": dynamics_rate,
+        "pre_failure_warning_coverage": warning_coverage,
         "errors": errors,
     }
     if errors:

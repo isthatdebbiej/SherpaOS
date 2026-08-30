@@ -8,7 +8,7 @@ import pytest
 
 from sherpaos.contracts import RobotTelemetry
 from sherpaos.datasets.generate import generate_dataset
-from sherpaos.datasets.manifest import write_checksums
+from sherpaos.datasets.manifest import read_json, write_checksums
 from sherpaos.datasets.split import build_split_manifest
 from sherpaos.datasets.validate import DatasetValidationError, validate_dataset
 from sherpaos.evaluation.ground_truth import ScenarioGroundTruth
@@ -122,8 +122,14 @@ def test_resumability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_pa
     output = tmp_path / "resume"
     generate_dataset(matrix_path, 2, output)
     assert calls == 2
+    first_manifest = read_json(output / "scenario_manifest.json")
     generate_dataset(matrix_path, 2, output)
     assert calls == 2
+    resumed_manifest = read_json(output / "scenario_manifest.json")
+    assert resumed_manifest["completed"] == first_manifest["completed"]
+    assert all(
+        "terrain_zone" in row and "max_slope_deg" in row for row in resumed_manifest["completed"]
+    )
 
 
 def test_checksum_corruption_detection(
@@ -136,4 +142,21 @@ def test_checksum_corruption_detection(
     with path.open("ab") as handle:
         handle.write(b"corrupt")
     with pytest.raises(DatasetValidationError, match="checksum mismatch"):
+        validate_dataset(output)
+
+
+def test_validation_rejects_episode_without_pre_failure_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_path: Path
+) -> None:
+    monkeypatch.setattr("sherpaos.datasets.generate.run_episode", _fake_episode)
+    output = tmp_path / "short"
+    generate_dataset(matrix_path, 20, output)
+    manifest_path = output / "scenario_manifest.json"
+    import json
+
+    manifest = json.loads(manifest_path.read_text())
+    manifest["completed"][0]["windows"] = 0
+    manifest_path.write_text(json.dumps(manifest))
+    write_checksums(output)
+    with pytest.raises(DatasetValidationError, match="fewer than 10 usable"):
         validate_dataset(output)
