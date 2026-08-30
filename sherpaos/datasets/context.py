@@ -61,6 +61,7 @@ def build_episode_context(
         "geographic_score": [],
         "geographic_confidence": [],
         "geographic_action": [],
+        "geographic_go_no_go_label": [],
     }
     count = max(1, len(telemetry) - 1)
     route_span = route.max_cumulative_distance_m - route.min_cumulative_distance_m
@@ -111,10 +112,18 @@ def build_episode_context(
         _add_report(values, "telemetry", telemetry_report)
         _add_report(values, "battery", battery_report)
         _add_report(values, "geographic", geographic_report)
+        values["geographic_go_no_go_label"] = {
+            "PASS": "GO",
+            "LIMIT_SPEED": "CAUTION",
+            "REQUEST_HOLD": "NO_GO",
+        }[geographic_report.recommended_action.value]
         for key, value in values.items():
             rows[key].append(np.nan if value is None else value)
     arrays = {
-        key: np.asarray(values, dtype=str if key.endswith("_action") else None)
+        key: np.asarray(
+            values,
+            dtype=str if key.endswith("_action") or key.endswith("_label") else None,
+        )
         for key, values in rows.items()
     }
     return EpisodeContext(arrays)

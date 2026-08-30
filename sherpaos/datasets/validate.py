@@ -55,6 +55,9 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
     if len(set(completed_ids)) != len(completed_ids):
         errors.append("duplicate episode IDs")
     if not contract_mode:
+        settings = scenario.get("settings", {})
+        stress_slope_min = float(settings.get("stress_slope_min_deg", 16.0))
+        terrain_max_slope = float(settings.get("terrain_max_slope_deg", 30.0))
         short = [row.get("episode_id") for row in completed if int(row.get("windows", 0)) < 10]
         if short:
             errors.append(
@@ -70,12 +73,24 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
         missed_steep = [
             row.get("episode_id")
             for row in completed
-            if row.get("terrain_zone") == 4 and float(row.get("max_slope_deg", 0.0)) < 15.5
+            if row.get("terrain_zone") == 4
+            and float(row.get("max_slope_deg", 0.0)) < stress_slope_min - 0.5
         ]
         if missed_steep:
             errors.append(
-                "steep terrain scenarios never contacted a >=16 degree segment: "
+                "stress terrain scenarios never contacted a "
+                f">={stress_slope_min:g} degree segment: "
                 + ", ".join(str(value) for value in missed_steep)
+            )
+        excessive_slope = [
+            row.get("episode_id")
+            for row in completed
+            if float(row.get("max_slope_deg", 0.0)) > terrain_max_slope + 0.5
+        ]
+        if excessive_slope:
+            errors.append(
+                f"episodes exceeded {terrain_max_slope:g} degree terrain cap: "
+                + ", ".join(str(value) for value in excessive_slope)
             )
 
     shard_size = int(scenario.get("settings", {}).get("shard_episodes", 10))

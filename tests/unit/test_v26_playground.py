@@ -66,11 +66,11 @@ def test_scene_uses_connected_visible_collision_segments() -> None:
     assert all("ridge_" not in xml for xml in scenes)
     np.testing.assert_allclose(projected_gravity(np.array([1, 0, 0, 0])), [0, 0, -1])
     assert TERRAIN_ZONE_PROFILES[0] == (2.0, 4.0, 5.0, 4.0)
-    assert TERRAIN_ZONE_PROFILES[4] == (10.0, 16.0, 22.0, 30.0)
+    assert TERRAIN_ZONE_PROFILES[4] == (8.0, 10.0, 12.0, 15.0)
     assert TERRAIN_ZONE_LENGTHS_M[4] == (0.65, 0.90, 1.30, 2.65)
     assert all(abs(sum(lengths) - 4.5) < 1e-9 for lengths in TERRAIN_ZONE_LENGTHS_M[:4])
     assert abs(sum(TERRAIN_ZONE_LENGTHS_M[4]) - 5.5) < 1e-9
-    assert terrain_slope_for_geom(4, "terrain_segment_2") == 22.0
+    assert terrain_slope_for_geom(4, "terrain_segment_2") == 12.0
     assert terrain_slope_for_geom(4, "spawn_apron") == 0.0
 
 
@@ -83,7 +83,7 @@ def test_himalayan_heightfields_are_deterministic_distinct_and_spawn_flat(tmp_pa
     np.testing.assert_array_equal(maps[4], terrain_heightmap(4))
     assert terrain_slope_deg_at(0, 0.0, 0.0) == 0.0
     assert 3.0 <= terrain_slope_deg_at(0, 5.0, 0.0) <= 5.0
-    assert 27.0 <= terrain_slope_deg_at(4, 5.0, 0.0) <= 31.0
+    assert 14.0 <= terrain_slope_deg_at(4, 5.0, 0.0) <= 16.0
     output = tmp_path / "terrain.png"
     write_terrain_png(output, 4)
     assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")

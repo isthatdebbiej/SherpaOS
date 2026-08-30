@@ -83,6 +83,7 @@ def test_deterministic_generation_and_observation_label_separation(
     with np.load(first / "context/shard-000.npz", allow_pickle=False) as context:
         assert "current_wind_mps" in context.files
         assert "forecast_wind_mps" in context.files
+        assert "geographic_go_no_go_label" in context.files
         assert np.array_equal(context["wind_mps"], context["current_wind_mps"])
         assert np.all(context["forecast_wind_mps"] >= 0.0)
     assert validate_dataset(first)["status"] == "GREEN"
@@ -120,7 +121,7 @@ def test_production_conditions_are_deterministically_diverse() -> None:
     nominal_winds = [_wind_for("nominal", index) for index in range(50)]
     assert len(set(commands)) == 50
     assert len(set(nominal_winds)) > 10
-    assert max(nominal_winds) <= 8.4
+    assert max(nominal_winds) <= 8.65
     assert _wind_for("combined", 4) == 55.6
     assert _wind_for("combined", 44) == 55.6
 

@@ -191,3 +191,4 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 - The validated 20-episode v6q pilot completed 20/20 episodes with 103 input features, 9.96% mobility positives, 13.07% dynamics positives, and zero validation errors.
 - Episode 053 physically contacted 10- and 16-degree ice segments before falling at step 477. The authored 22- and 30-degree sections were not contacted and are not claimed as training exposure.
 - Source manifests now record the clean Git SHA, exact source/config hashes, and frozen locomotion-policy hash before the 200-episode production run.
+- The second production cohort uses a separately versioned 10-15 degree stress envelope. Its connected steep-ice profile is 8/10/12/15 degrees, validation requires physical contact at or above 10 degrees, and no episode may exceed the configured 15-degree terrain cap.

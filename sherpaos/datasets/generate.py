@@ -143,7 +143,7 @@ def _command_for(category_index: int) -> tuple[float, float, float]:
     group = category_index // 5
     speed_delta = (group - 4.5) * 0.004
     yaw_delta = ((group % 3) - 1) * 0.003
-    return (base[0] + speed_delta, base[1], base[2] + yaw_delta)
+    return (base[0] + speed_delta + 0.01, base[1], base[2] + yaw_delta)
 
 
 def _terrain_zone_for(category: str, category_index: int) -> int:
@@ -173,7 +173,7 @@ def _wind_for(category: str, category_index: int) -> float:
     if target >= 50.0:
         return target
     group_offset = (-0.4, -0.2, 0.0, 0.2, 0.4)[category_index // 10]
-    return target + group_offset
+    return target + group_offset + 0.25
 
 
 def generate_dataset(matrix_path: Path, episodes: int, output: Path) -> dict[str, Any]:

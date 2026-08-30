@@ -17,7 +17,7 @@ TERRAIN_ZONE_PROFILES = (
     (5.0, 8.0, 12.0, 9.0),
     (4.0, 7.0, 10.0, 6.0),
     (5.0, 9.0, 13.0, 8.0),
-    (10.0, 16.0, 22.0, 30.0),
+    (8.0, 10.0, 12.0, 15.0),
 )
 TERRAIN_ZONE_SLOPE_DEG = tuple(max(profile) for profile in TERRAIN_ZONE_PROFILES)
 TERRAIN_ZONE_LENGTHS_M = (
@@ -63,7 +63,7 @@ def terrain_heightmap(terrain_zone: int, size: int = TERRAIN_GRID_SIZE) -> np.nd
         rocks = 0.14 * np.maximum(0.0, np.sin(4.5 * xx) * np.cos(3.4 * yy)) ** 3
         height += blend * (rough + rocks)
     else:
-        height = np.tan(np.deg2rad(30.0)) * smooth_rise
+        height = np.tan(np.deg2rad(15.0)) * smooth_rise
         height += 0.025 * blend * np.sin(2.4 * yy)
     height -= float(height.min())
     return np.clip(height / TERRAIN_MAX_HEIGHT_M, 0.0, 1.0)
