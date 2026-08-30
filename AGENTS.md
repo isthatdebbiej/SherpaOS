@@ -25,6 +25,15 @@ sherpa overnight launch|status|fetch      # cloud validation pipeline (stubbed u
 
 Or via uv: `uv run sherpa ...`, `uv run pytest`.
 
+Field Journal:
+
+```text
+cd web
+npm ci
+npm run build
+npm run dev
+```
+
 ## Ownership boundaries (module lanes)
 
 | Area | Path | Notes |
@@ -37,6 +46,8 @@ Or via uv: `uv run sherpa ...`, `uv run pytest`.
 | Evaluation | `sherpaos/evaluation/` | Baselines, paired evaluator, metrics |
 | CLI | `sherpaos/cli/` | Wires everything together; touches all modules by import only |
 | Tests | `tests/` | unit, property (Hypothesis), integration, regression |
+| Expedition memory | `sherpaos/expedition/`, `sherpaos/voice/` | Post-day immutable bag inspection/reflection boundary; never actuation |
+| Field Journal | `web/` | Next.js presentation UI and mock/API day state |
 
 Do not edit another lane's files without reviewing `docs/DECISIONS.md` first and recording
 why. Shared types live only in `sherpaos/contracts.py`.
@@ -56,6 +67,10 @@ why. Shared types live only in `sherpaos/contracts.py`.
    during evaluation becomes a regression test (`tests/regression/`).
 6. Prefer deterministic rules before any learned model. A learned model ships only if it
    beats the deterministic rules on held-out scenario groups and passes ONNX parity.
+7. Reflection and voice are post-mission presentation features. They must never enter the
+   telemetry-to-guard-to-actuation loop or receive privileged simulator truth.
+8. Raw bags, `OPENAI_API_KEY`, ingest secrets, and SSH credentials must never enter the
+   browser bundle or Git. Deployment is Vultr-only unless the user explicitly revises it.
 
 ## Definition of done (per change)
 
@@ -65,3 +80,5 @@ why. Shared types live only in `sherpaos/contracts.py`.
 - If touching policy: at least one scenario shows the decision changing the simulated
   outcome (the "3:30 PM gate" in `docs/plan.md`).
 - `docs/STATUS.md` updated with current state, blockers, next steps.
+- If touching `web/`, `npm run build` is green and current/past/locked day behavior is
+  checked at desktop and mobile widths.

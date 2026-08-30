@@ -13,13 +13,18 @@ green and the integration has a strict timebox.
 
 ## Vultr instance
 
+This runbook describes a disposable validation/Playground host. The Field Journal now
+runs on a persistent Vultr application host; never destroy or clean that host by
+following this validation runbook. If both workloads share one instance, use isolated
+directories/services and skip the destructive cleanup guidance.
+
 Use Ubuntu 22.04 or 24.04. For the SherpaOS validation, a CPU instance is sufficient.
 For Playground, choose an NVIDIA GPU instance with a working vendor driver image and
 enough disk for CUDA/JAX packages and Menagerie assets. Start with at least 40 GB free.
 
-Do not put API keys in commands, cloud-init, the repository, or captured logs. Use Vultr
-only as compute reached over SSH. Restrict SSH ingress, use an SSH key, and destroy the
-instance after artifacts have been retrieved.
+Do not put API keys in commands, cloud-init, the repository, or captured logs. Restrict
+SSH ingress and use an SSH key. Destroy the instance after artifacts are retrieved only
+when it was explicitly provisioned as a disposable validation host.
 
 Before paying for GPU time:
 
@@ -144,6 +149,7 @@ enable rscope output; starting the viewer alone is not visual-rollout evidence.
 
 ## Cleanup
 
-After checksum verification on the local machine, remove or destroy the disposable
-Vultr instance through the provider console. Confirm billing has stopped. Retain only
-the evidence archive and the exact repository SHA needed to reproduce it.
+After checksum verification on the local machine, remove or destroy only an explicitly
+disposable validation instance through the provider console. Never destroy the
+persistent Field Journal/application host. Confirm billing has stopped for disposable
+resources. Retain the evidence archive and exact repository SHA needed to reproduce it.

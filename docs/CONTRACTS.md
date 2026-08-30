@@ -89,3 +89,16 @@ Estimator/policy code may only read fields present on `RobotTelemetry`. Simulato
 ground truth used for scoring (`sherpaos/evaluation/ground_truth.py`, once written)
 must never be passed into estimator/policy call paths. This is enforced by a dedicated
 `leakage`-marked test in `tests/unit/`.
+
+## Expedition memory and reflection boundary
+
+Authoritative backend types live in `sherpaos/expedition/models.py`; the current visual
+fixture type lives in `web/src/types/expedition.ts` until API integration is complete.
+Raw `.mcap`/rosbag2 `.db3` files are immutable per-day inputs. Inspection records their
+hash, size, time range, topic coverage, and allowlist decision before any voice or
+reflection call is allowed.
+
+The reflection layer may receive the approved day plan, verified onboard-topic summary,
+derived event report, bag hash, and prior diary entries. It must not receive evaluator
+ground truth, hidden friction/contact labels, or actuation authority. Its output is a
+presentation artifact (`diary.json` plus optional narration), never a `GuardDecision`.

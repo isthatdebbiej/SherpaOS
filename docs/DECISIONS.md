@@ -227,3 +227,32 @@ preserves a fully offline walking activation.
 The playground wraps g1_v26_iter42290.onnx as a frozen controller using its exact 5x48 observation and 12-action contract. SherpaOS neither trains locomotion nor intervenes. Weights stay outside Git and are accepted only at the pinned SHA-256. The full MuJoCo Menagerie G1 is used for rendering.
 
 Foreground mountain silhouettes were rejected because they occluded the robot. Terrain severity is collision geometry, and a segmentation-based minimum visibility gate is mandatory.
+
+## 2026-08-29 — All deployable services run on Vultr
+
+The user explicitly rejected Vercel for this product. The existing Vultr host is the
+single deployment target for the Python expedition API, local ROS-bag storage and
+processing, OpenAI-backed reflection/voice worker, Next.js Field Journal, and generated
+diary/audio artifacts. Hugging Face is also removed from the current deployment path.
+
+This is a deployment simplification, not a change to the runtime safety architecture.
+The LLM remains strictly post-mission and cannot participate in guard fusion or
+actuation. A general Vultr account API key is not required when services read the local
+instance filesystem. `OPENAI_API_KEY` remains server-only.
+
+**Rejected alternative:** Vercel frontend plus a remote Vultr worker. Rejected because
+the team wants one host, one artifact boundary, and no cross-provider operational
+dependency during the demo.
+
+## 2026-08-29 — Field Journal is the approved presentation UI
+
+The repository now contains `web/`, a Next.js Field Journal with an original animated
+grayscale Everest relief, central ascent route, clickable five-day camps, written past
+entries, current-day speech, locked future days, Pemba reactions, snow, parallax,
+collectible memories, and reduced-motion support. The UX uses mock day fixtures until
+the API connection is completed.
+
+The design follows the spatial grammar of Robot Everest (front-facing relief, luminous
+route, altitude/camp progression) without copying its proprietary assets or source.
+Unity was rejected in favor of web-native SVG/CSS/Motion because the experience needs
+fast browser startup, responsive text, and straightforward deployment from Vultr.
