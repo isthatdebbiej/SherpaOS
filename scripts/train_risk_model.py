@@ -39,28 +39,32 @@ class TCN(nn.Module):
 
 def load(root, split):
     rows = [json.loads(x) for x in (root / f"{split}_index.jsonl").read_text().splitlines()]
-    shards = defaultdict(set)
+    shards = defaultdict(dict)
     for r in rows:
-        shards[(r["observations"], r["labels"])].add(r["episode_id"])
+        shards[(r["observations"], r["labels"])][r["episode_id"]] = r["global_episode_id"]
     xs = []
     ys = []
     ids = []
-    for (op, lp), wanted in sorted(shards.items()):
+    cohorts = []
+    for (op, lp), identity in sorted(shards.items()):
         with (
             np.load(root / op, allow_pickle=False) as o,
             np.load(root / lp, allow_pickle=False) as labels,
         ):
             assert np.array_equal(o["episode_ids"], labels["episode_ids"])
-            m = np.isin(o["episode_ids"], list(wanted))
+            m = np.isin(o["episode_ids"], list(identity))
             xs += [o["observations"][m]]
             ys += [np.c_[labels["mobility_targets"][m], labels["dynamics_targets"][m]]]
-            ids += [o["episode_ids"][m]]
+            global_ids = np.asarray([identity[value] for value in o["episode_ids"][m]])
+            ids += [global_ids]
+            cohorts += [np.asarray([value.split("/", 1)[0] for value in global_ids])]
     x = np.concatenate(xs).astype("float32")
     y = np.concatenate(ys).astype("float32")
     e = np.concatenate(ids)
     assert x.shape[1:] == (100, 103) and np.isfinite(x).all()
-    assert set(e) == {r["episode_id"] for r in rows}
-    return x, y, e
+    cohort = np.concatenate(cohorts)
+    assert set(e) == {r["global_episode_id"] for r in rows}
+    return x, y, e, cohort
 
 
 def metrics(y, p):
@@ -93,6 +97,12 @@ def metrics(y, p):
             "auroc": float(auc),
             "brier": float(np.mean((p[:, j] - y[:, j]) ** 2)),
             "threshold": float(best),
+            "recall": float(
+                np.sum((p[:, j] >= best) & (y[:, j] == 1)) / max(np.sum(y[:, j] == 1), 1)
+            ),
+            "false_positive_rate": float(
+                np.sum((p[:, j] >= best) & (y[:, j] == 0)) / max(np.sum(y[:, j] == 0), 1)
+            ),
         }
     return out
 
@@ -106,8 +116,8 @@ c = yaml.safe_load(Path("configs/training.yaml").read_text())
 random.seed(c["seed"])
 np.random.seed(c["seed"])
 torch.manual_seed(c["seed"])
-xt, yt, it = load(z.dataset, "train")
-xv, yv, iv = load(z.dataset, "validation")
+xt, yt, it, ct = load(z.dataset, "train")
+xv, yv, iv, cv = load(z.dataset, "validation")
 assert not (set(it) & set(iv))
 mean = xt.mean((0, 1))
 std = xt.std((0, 1))
@@ -152,12 +162,20 @@ for epoch in range(c["max_epochs"]):
         stale += 1
         if stale >= c["patience"]:
             break
+model.load_state_dict(state)
+model.eval()
+with torch.no_grad():
+    logits = model(torch.from_numpy(xv).to(dev).transpose(1, 2))
 p = torch.sigmoid(logits).cpu().numpy()
+validation = metrics(yv, p)
+validation["by_cohort"] = {
+    cohort: metrics(yv[cv == cohort], p[cv == cohort]) for cohort in sorted(set(cv))
+}
 z.output.mkdir(parents=True, exist_ok=True)
 torch.save({"state_dict": state, "config": c}, z.output / "model.pt")
 for n, v in {
     "normalization.json": {"mean": mean.tolist(), "std": std.tolist()},
-    "validation_metrics.json": metrics(yv, p),
+    "validation_metrics.json": validation,
     "training_manifest.json": {
         "device": str(dev),
         "train_episodes": len(set(it)),
