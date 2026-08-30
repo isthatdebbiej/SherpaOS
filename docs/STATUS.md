@@ -202,3 +202,22 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 - Added a default Live Demo web view with raw robot stream, five guard cards,
   requested-versus-applied velocity, decision IDs, receipts, and event history.
 - Production Next.js build and focused policy tests pass.
+
+
+## 2026-08-30 — Hugging Face Radio and operator evidence journal
+
+- Replaced the fictional five-day archive with exactly four simulation evidence memories:
+  nominal, mobility, dynamics, and combined.
+- Each memory is derived only from immutable train/validation indexes and shards. It reports
+  episode/window counts, positive labels, evaluator-only falls, deterministic guard actions,
+  wind/slope context, provenance, and zero real-world hardware episodes.
+- The operator Journal uses a linear assessment and timestamped evidence log rather than
+  dashboard cards. Representative timestamps remain episode-relative at 50 Hz.
+- Validation coverage audit found 20 nominal validation episodes and zero mobility,
+  dynamics, or combined validation episodes. This limitation is displayed and must be fixed
+  before claiming hazard validation quality.
+- Radio Q&A is grounded in one of the four static memories plus the latest live supervisor
+  decision and actuation receipt. Hugging Face Inference Providers perform Whisper ASR and
+  Llama Q&A; the Hugging Face MMS-TTS checkpoint runs locally on Vultr CPU.
+- The live evidence bus now persists atomic current evidence and JSONL history so simulator
+  and API processes share authentic events.

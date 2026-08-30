@@ -1,0 +1,79 @@
+{
+  "day": 4,
+  "scenario_family": "combined",
+  "title": "Combined storm and terrain stress",
+  "scope": "simulation training only; no validation members",
+  "provenance": {
+    "package": "sherpaos-himalayan-risk-400",
+    "cohorts": [
+      "high-slope",
+      "low-slope"
+    ],
+    "controller": "frozen OSS locomotion policy; SherpaOS intervention disabled",
+    "feature_width": 103
+  },
+  "episodes": {
+    "train": 60,
+    "validation": 0
+  },
+  "windows": {
+    "train": 1418,
+    "validation": 0
+  },
+  "positive_windows": {
+    "train": {
+      "mobility": 430,
+      "dynamics": 458
+    },
+    "validation": {
+      "mobility": 0,
+      "dynamics": 0
+    }
+  },
+  "physical_outcomes": {
+    "train_falls": 58,
+    "validation_falls": 0,
+    "note": "Evaluator-only fall truth; never included in observation arrays."
+  },
+  "context": {
+    "control_steps": 19904,
+    "telemetry_actions": {
+      "PASS": 19904
+    },
+    "battery_actions": {
+      "PASS": 16554,
+      "LIMIT_SPEED": 3350
+    },
+    "geographic_actions": {
+      "LIMIT_SPEED": 7141,
+      "REQUEST_HOLD": 12763
+    },
+    "geographic_labels_low_slope_only": {
+      "GO": 0,
+      "CAUTION": 3635,
+      "NO_GO": 6834
+    },
+    "current_wind_mps": {
+      "min": 6.86,
+      "max": 23.1506
+    },
+    "forecast_wind_mps": {
+      "min": 9.8,
+      "max": 55.6
+    },
+    "route_context_slope_deg": {
+      "min": -2.07,
+      "max": 6.36
+    }
+  },
+  "real_world_telemetry": {
+    "episodes": 0,
+    "status": "UNAVAILABLE",
+    "statement": "No physical G1 ROS bag or field telemetry has been ingested. These values are simulation evidence only."
+  },
+  "limitations": [
+    "No combined scenario group is present in validation.",
+    "55.6 m/s is forecast context; maximum contemporaneous simulated wind was 23.1506 m/s.",
+    "NO-GO labels and their counts cover only the low-slope cohort."
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "day": 1,
+  "scenario_family": "nominal",
+  "title": "Nominal baseline",
+  "scope": "simulation train and validation only",
+  "provenance": {
+    "package": "sherpaos-himalayan-risk-400",
+    "cohorts": [
+      "high-slope",
+      "low-slope"
+    ],
+    "controller": "frozen OSS locomotion policy; SherpaOS intervention disabled",
+    "feature_width": 103
+  },
+  "episodes": {
+    "train": 60,
+    "validation": 20
+  },
+  "windows": {
+    "train": 2163,
+    "validation": 708
+  },
+  "positive_windows": {
+    "train": {
+      "mobility": 0,
+      "dynamics": 5
+    },
+    "validation": {
+      "mobility": 13,
+      "dynamics": 21
+    }
+  },
+  "physical_outcomes": {
+    "train_falls": 1,
+    "validation_falls": 3,
+    "note": "Evaluator-only fall truth; never included in observation arrays."
+  },
+  "context": {
+    "control_steps": 39740,
+    "telemetry_actions": {
+      "PASS": 39740
+    },
+    "battery_actions": {
+      "PASS": 39740
+    },
+    "geographic_actions": {
+      "PASS": 23740,
+      "LIMIT_SPEED": 16000
+    },
+    "geographic_labels_low_slope_only": {
+      "GO": 11986,
+      "CAUTION": 8000,
+      "NO_GO": 0
+    },
+    "current_wind_mps": {
+      "min": 3.36,
+      "max": 8.4004
+    },
+    "forecast_wind_mps": {
+      "min": 4.8,
+      "max": 8.65
+    },
+    "route_context_slope_deg": {
+      "min": -2.07,
+      "max": 6.36
+    }
+  },
+  "real_world_telemetry": {
+    "episodes": 0,
+    "status": "UNAVAILABLE",
+    "statement": "No physical G1 ROS bag or field telemetry has been ingested. These values are simulation evidence only."
+  },
+  "limitations": [
+    "Validation contains only nominal scenarios.",
+    "Geographic GO/CAUTION/NO-GO labels exist only in the low-slope cohort.",
+    "Route-context slope is not simulator true terrain slope."
+  ]
+}

@@ -28,7 +28,7 @@ export type RobotAssets = {
 };
 
 export type ExpeditionDay = {
-  day: 1 | 2 | 3 | 4 | 5;
+  day: 1 | 2 | 3 | 4;
   date: string;
   camp: string;
   altitude: number;

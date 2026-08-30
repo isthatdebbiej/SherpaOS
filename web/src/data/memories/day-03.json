@@ -1,0 +1,79 @@
+{
+  "day": 3,
+  "scenario_family": "dynamics",
+  "title": "Dynamics and body stress",
+  "scope": "simulation training only; no validation members",
+  "provenance": {
+    "package": "sherpaos-himalayan-risk-400",
+    "cohorts": [
+      "high-slope",
+      "low-slope"
+    ],
+    "controller": "frozen OSS locomotion policy; SherpaOS intervention disabled",
+    "feature_width": 103
+  },
+  "episodes": {
+    "train": 40,
+    "validation": 0
+  },
+  "windows": {
+    "train": 1153,
+    "validation": 0
+  },
+  "positive_windows": {
+    "train": {
+      "mobility": 105,
+      "dynamics": 373
+    },
+    "validation": {
+      "mobility": 0,
+      "dynamics": 0
+    }
+  },
+  "physical_outcomes": {
+    "train_falls": 36,
+    "validation_falls": 0,
+    "note": "Evaluator-only fall truth; never included in observation arrays."
+  },
+  "context": {
+    "control_steps": 15521,
+    "telemetry_actions": {
+      "PASS": 15521
+    },
+    "battery_actions": {
+      "PASS": 15521
+    },
+    "geographic_actions": {
+      "PASS": 2000,
+      "LIMIT_SPEED": 10807,
+      "REQUEST_HOLD": 2714
+    },
+    "geographic_labels_low_slope_only": {
+      "GO": 1000,
+      "CAUTION": 5514,
+      "NO_GO": 1423
+    },
+    "current_wind_mps": {
+      "min": 5.32,
+      "max": 17.2133
+    },
+    "forecast_wind_mps": {
+      "min": 7.6,
+      "max": 25.25
+    },
+    "route_context_slope_deg": {
+      "min": -2.07,
+      "max": 6.36
+    }
+  },
+  "real_world_telemetry": {
+    "episodes": 0,
+    "status": "UNAVAILABLE",
+    "statement": "No physical G1 ROS bag or field telemetry has been ingested. These values are simulation evidence only."
+  },
+  "limitations": [
+    "No dynamics scenario group is present in validation.",
+    "NO-GO is a preserved geographic label, not the learned mobility/dynamics model output.",
+    "Geographic labels cover only the low-slope cohort."
+  ]
+}
