@@ -82,12 +82,18 @@ def _radio_evidence(day: int) -> dict[str, object]:
 
 
 def _answer(question: str, day: int) -> tuple[str, dict[str, object]]:
+    evidence = _radio_evidence(day)
+    if "stop" in question.casefold() and evidence["latest_live_decision"] is None:
+        return (
+            "I have no live stop decision or actuation receipt to explain. Start the live "
+            "supervisor run, then ask again with its decision evidence. Over.",
+            evidence,
+        )
     token = os.environ.get("HF_TOKEN")
     if not token:
         raise HTTPException(503, "HF_TOKEN is not configured")
     from huggingface_hub import InferenceClient
 
-    evidence = _radio_evidence(day)
     client = InferenceClient(provider="auto", api_key=token)
     response = client.chat_completion(
         model=os.environ.get("SHERPA_HF_CHAT_MODEL", "meta-llama/Llama-3.1-8B-Instruct"),
