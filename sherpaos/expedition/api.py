@@ -17,7 +17,14 @@ from sherpaos.voice.tools import ExpeditionVoiceTools
 app = FastAPI(title="SherpaOS Expedition Memory API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.environ.get(
+            "SHERPA_WEB_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if origin.strip()
+    ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
