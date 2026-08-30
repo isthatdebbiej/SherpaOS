@@ -7,6 +7,17 @@
 
 ## Implemented
 
+- Real expedition-memory vertical slice: immutable per-day `.mcap`/rosbag2 `.db3`
+  upload, streaming SHA-256, read-only bag inspection, topic/message/time coverage,
+  allowlisted onboard-topic policy, and explicit privileged-topic rejection.
+- Local FastAPI boundary for day manifests, uploads, read-only voice tools, and
+  push-to-talk audio turns. Voice turns are locked until a verified bag exists and
+  require `OPENAI_API_KEY`; the model receives the verified bag hash and approved
+  topic coverage, never simulator truth or actuation authority.
+- Field Journal Memory Radio UI with real day selection, upload status, manifest
+  checksum/message/topic display, half-duplex microphone capture, grounded transcript,
+  and spoken response playback.
+
 - MuJoCo Menagerie G1 posture/stepping simulator with nominal, mixed-traction,
   disturbance, actuator-health, slope, sensor-noise, and synthetic battery scenarios.
 - Five independent guard reports: mobility, dynamics, telemetry health, battery margin,
@@ -45,6 +56,16 @@ Claude's `.venv` is owned by a different Windows SID from the Codex runner. Code
 an isolated `.venv-codex` for verification and did not replace Claude's environment.
 Git commands in evidence generation now pass the repository as an explicit safe directory.
 
+## Expedition memory checkpoint (2026-08-29 PT)
+
+- Raw bags live under gitignored `var/expeditions/<expedition>/day-XX/raw/`; promotion is
+  atomic and an existing day cannot be replaced implicitly.
+- rosbag2 SQLite inspection works without a ROS runtime. MCAP inspection uses the locked
+  `mcap` expedition extra. Full message decoding/time-series Parquet derivation remains
+  the next backend slice.
+- Full pytest suite and Ruff are green; the Next.js production build is green.
+- Live voice was not called during verification because no API credential was supplied.
+
 ## Next three tasks
 
 1. Review and commit this integration checkpoint; Vultr validation intentionally refuses
@@ -74,3 +95,10 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 1. Push the committed dataset-pipeline SHA and clone that exact SHA on Vultr.
 2. Run exactly 200 episodes on Vultr, then validate and freeze checksums.
 3. Download and checksum-verify the immutable dataset before any later training task.
+
+## Frozen v26 Himalayan playground checkpoint (2026-08-29 PT)
+
+- Added reproducible v26 iter42290 ONNX download with pinned SHA-256 verification.
+- Added its exact 240-input/12-action controller and full Menagerie G1 renderer.
+- Added a segmentation visibility gate so an occluded G1 cannot pass.
+- See docs/V26_HIMALAYA_PLAYGROUND.md for teammate commands.

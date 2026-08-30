@@ -21,4 +21,5 @@ artifacts/datasets/*.tar.gz
 artifacts/incidents/*.json
 !artifacts/incidents/.gitkeep
 *.npz
+var/
 .DS_Store

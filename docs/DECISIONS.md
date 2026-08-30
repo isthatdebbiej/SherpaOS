@@ -114,3 +114,9 @@ policy training/fine-tuning, Transformers, VLAs, and end-to-end control are out 
 Simulator observations and privileged labels are stored separately; evaluator truth now
 retains tilt and planted-foot slip magnitude so targets describe physical outcomes rather
 than merely copying scenario parameters.
+
+## 2026-08-29 - Frozen Zealot v26 policy is the Himalayan visualization lane
+
+The playground wraps g1_v26_iter42290.onnx as a frozen controller using its exact 5x48 observation and 12-action contract. SherpaOS neither trains locomotion nor intervenes. Weights stay outside Git and are accepted only at the pinned SHA-256. The full MuJoCo Menagerie G1 is used for rendering.
+
+Foreground mountain silhouettes were rejected because they occluded the robot. Terrain severity is collision geometry, and a segmentation-based minimum visibility gate is mandatory.

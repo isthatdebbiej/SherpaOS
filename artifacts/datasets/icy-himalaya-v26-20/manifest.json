@@ -1,0 +1,41 @@
+{
+  "dataset_id": "icy-himalaya-v26-20",
+  "qualification_only": true,
+  "episodes": 20,
+  "policy": "haixuantao/zealot-g1-locomotion:g1_v26_iter42290.onnx",
+  "policy_sha256": "1e21412a09f3af7fa2dbdec58de4d4600e2679862a1b24c502c0a02916bd440f",
+  "controller_only": true,
+  "sherpaos_intervention": false,
+  "control_hz": 50,
+  "max_steps_per_episode": 500,
+  "terrain_family": "inclined icy Himalayan procedural",
+  "slope_range_deg": [
+    8.0,
+    20.0
+  ],
+  "cross_slope_range_deg": [
+    -10.0,
+    10.0
+  ],
+  "friction_values": [
+    0.65,
+    0.42
+  ],
+  "snow_model": "rigid crusted surface; no deformable sinkage",
+  "observation_fields": [
+    "leg_q",
+    "leg_qdot",
+    "base_quaternion",
+    "base_angular_velocity",
+    "command",
+    "policy_action"
+  ],
+  "privileged_label_fields": [
+    "true_friction",
+    "rough_terrain",
+    "push_active",
+    "tilt_deg",
+    "fall_truth"
+  ],
+  "representative_video": "videos/v26-himalaya-icy-snow-G1-visible.mp4"
+}

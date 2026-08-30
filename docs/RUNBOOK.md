@@ -3,8 +3,28 @@
 ## Setup
 
 ```bash
-uv sync --extra dev
+uv sync --extra dev --extra expedition
 ```
+
+## Expedition memory and radio
+
+The authoritative recordings are written beneath the gitignored `var/expeditions/`
+directory. Set `SHERPA_EXPEDITION_STORE` to use another local disk.
+
+```bash
+uv run uvicorn sherpaos.expedition.api:app --host 127.0.0.1 --port 8000
+```
+
+In another terminal:
+
+```bash
+cd web
+npm run dev
+```
+
+Open the Field Journal, choose a day in **Call Pemba**, and upload a real `.mcap` or
+rosbag2 `.db3`. Voice turns additionally require `OPENAI_API_KEY`. The frontend uses
+`http://127.0.0.1:8000` by default; override it with `NEXT_PUBLIC_SHERPA_API`.
 
 ## Local
 
