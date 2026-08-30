@@ -38,7 +38,7 @@ def _truth(index: int) -> ScenarioGroundTruth:
         disturbance_active=False,
         actuator_health=1.0,
         tilt_from_vertical_deg=0.0,
-        planted_foot_slip_mps=0.2 if index == 5 else 0.0,
+        planted_foot_slip_mps=1.2 if index == 5 else 0.0,
         true_unsafe=index == 5,
     )
 
@@ -73,3 +73,23 @@ def test_group_split_is_stable_and_dataset_files_must_be_separate(tmp_path: Path
         "episode_ids",
     }
     assert "mobility_targets" not in np.load(tmp_path / "observations.npz").files
+
+
+def test_fallen_episode_keeps_prefall_windows_through_termination() -> None:
+    telemetry = [_sample(index) for index in range(170)]
+    truth = [_truth(index) for index in range(170)]
+    dataset = build_episode_windows(
+        telemetry,
+        truth,
+        episode_id="falling",
+        scenario_group="falling-group",
+        window_steps=100,
+        horizon_steps=50,
+        stride=10,
+        fell=True,
+        mobility_failure=True,
+    )
+    assert dataset.observations.shape[0] == 8
+    np.testing.assert_array_equal(dataset.fall_targets, [0, 0, 1, 1, 1, 1, 1, 1])
+    np.testing.assert_array_equal(dataset.dynamics_targets, dataset.fall_targets)
+    np.testing.assert_array_equal(dataset.mobility_targets, dataset.fall_targets)

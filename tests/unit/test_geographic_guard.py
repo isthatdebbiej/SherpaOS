@@ -17,7 +17,9 @@ import pytest
 from sherpaos.contracts import GuardAction, GuardName, MissionContext, ReasonCode
 from sherpaos.geography import terrain
 from sherpaos.geography.guard import (
+    CRITICAL_COLD_THRESHOLD_C,
     EXTREME_SLOPE_THRESHOLD_DEG,
+    EXTREME_WIND_THRESHOLD_MPS,
     FAR_FROM_SAFE_WAYPOINT_THRESHOLD_M,
     MAX_AGE_SECONDS,
     STEEP_SLOPE_THRESHOLD_DEG,
@@ -285,6 +287,36 @@ def test_far_from_safe_waypoint_triggers_reason_code():
     assert ReasonCode.GEOGRAPHIC_FAR_FROM_SAFE_WAYPOINT not in near_report.reason_codes
     assert ReasonCode.GEOGRAPHIC_FAR_FROM_SAFE_WAYPOINT in far_report.reason_codes
     assert far_report.score > near_report.score
+
+
+def test_high_wind_is_environmental_risk_and_extreme_wind_holds():
+    guard = GeographicRiskGuard()
+    calm = guard.evaluate(make_context(wind_mps=4.0), now=NOW)
+    extreme = guard.evaluate(
+        make_context(wind_mps=EXTREME_WIND_THRESHOLD_MPS), now=NOW
+    )
+
+    assert ReasonCode.ENVIRONMENT_HIGH_WIND not in calm.reason_codes
+    assert ReasonCode.ENVIRONMENT_HIGH_WIND in extreme.reason_codes
+    assert extreme.score > calm.score
+    assert extreme.recommended_action == GuardAction.REQUEST_HOLD
+    assert extreme.provenance["wind_mps"] == f"{EXTREME_WIND_THRESHOLD_MPS:.2f}"
+
+
+def test_critical_cold_is_environmental_risk_and_holds():
+    report = GeographicRiskGuard().evaluate(
+        make_context(temperature_c=CRITICAL_COLD_THRESHOLD_C), now=NOW
+    )
+
+    assert ReasonCode.ENVIRONMENT_EXTREME_COLD in report.reason_codes
+    assert report.recommended_action == GuardAction.REQUEST_HOLD
+
+
+@pytest.mark.parametrize("bad_wind", [-1.0, math.nan, math.inf])
+def test_malformed_wind_fails_to_unavailable_context(bad_wind):
+    report = GeographicRiskGuard().evaluate(make_context(wind_mps=bad_wind), now=NOW)
+    assert ReasonCode.GEOGRAPHIC_CONTEXT_UNAVAILABLE in report.reason_codes
+    assert report.recommended_action != GuardAction.PASS
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,15 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
+from sherpaos.datasets.generate import (
+    _command_for,
+    _terrain_zone_for,
+    _wind_for,
+    scenario_for,
+)
+from sherpaos.sim import disturbances
 from sherpaos.sim.himalaya_scene import scene_xml
+from sherpaos.sim.runner import FALL_PELVIS_Z_M, FALL_TILT_DEG
 from sherpaos.sim.v26_playground import (
     DEFAULT_POSE,
     JOINTS,
@@ -25,6 +33,14 @@ from sherpaos.sim.v26_playground import (
     projected_gravity,
     robot_visibility,
 )
+from sherpaos.sim.v26_runner import (
+    LEFT_FOOT_BODY,
+    RIGHT_FOOT_BODY,
+    TERRAIN_GEOMS,
+    _body_geoms,
+    _geom_id,
+)
+from sherpaos.sim.weather import aerodynamic_force_n, wind_speed_at_step
 
 
 def arguments() -> argparse.Namespace:
@@ -42,11 +58,50 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--command-vx", type=float, default=0.4)
     parser.add_argument("--command-vy", type=float, default=0.0)
     parser.add_argument("--command-yaw", type=float, default=0.0)
+    parser.add_argument("--category", choices=("nominal", "mobility", "dynamics", "combined"))
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--storm", action="store_true")
     return parser.parse_args()
+
+
+def _blowing_snow(frame: np.ndarray, rng: np.random.Generator, wind_mps: float) -> np.ndarray:
+    """Add deterministic camera-space snow streaks; wind physics is applied separately."""
+    result = frame.copy()
+    height, width, _ = result.shape
+    count = int(180 + 14 * wind_mps)
+    xs = rng.integers(0, width, count)
+    ys = rng.integers(0, height, count)
+    length = np.maximum(2, (wind_mps / 5.0 + rng.random(count) * 5).astype(int))
+    for x, y, streak in zip(xs, ys, length, strict=True):
+        end = min(width, x + int(streak))
+        result[max(0, y - 1) : min(height, y + 1), x:end] = (235, 245, 255)
+    return result
+
+
+def _robot_frame_margin(segmentation: np.ndarray, robot_geom_ids: np.ndarray) -> int:
+    """Minimum distance from any robot pixel to a frame edge; zero means cropped."""
+    mask = np.isin(segmentation[:, :, 0], robot_geom_ids)
+    rows, columns = np.nonzero(mask)
+    if not rows.size:
+        return 0
+    height, width = mask.shape
+    return int(min(rows.min(), height - 1 - rows.max(), columns.min(), width - 1 - columns.max()))
 
 
 def main() -> None:
     args = arguments()
+    scenario = scenario_for(args.category, args.seed) if args.category and args.seed else None
+    category_index = args.seed % 50 if scenario is not None else 0
+    terrain_zone = _terrain_zone_for(args.category, category_index) if scenario is not None else 0
+    wind_target_mps = (
+        55.6
+        if args.storm
+        else _wind_for(args.category, category_index)
+        if scenario is not None
+        else 0.0
+    )
+    if scenario is not None:
+        args.command_vx, args.command_vy, args.command_yaw = _command_for(category_index)
     if shutil.which("ffmpeg") is None:
         raise SystemExit("ffmpeg is required")
     if not args.g1_dir.joinpath("g1.xml").is_file():
@@ -62,7 +117,7 @@ def main() -> None:
         raise SystemExit("install the playground extra: uv sync --extra playground") from exc
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", suffix=".xml", dir=args.g1_dir, delete=False) as handle:
-        handle.write(scene_xml())
+        handle.write(scene_xml(terrain_zone))
         scene_path = Path(handle.name)
     try:
         model = mujoco.MjModel.from_xml_path(str(scene_path))
@@ -85,6 +140,15 @@ def main() -> None:
         model.actuator_gainprm[aid, 0] = KP[index]
         model.actuator_biasprm[aid, 1] = -KP[index]
         model.actuator_biasprm[aid, 2] = -KD[index]
+    terrain_ids = {_geom_id(model, name) for name in TERRAIN_GEOMS}
+    terrain_ids.discard(-1)
+    if scenario is not None and scenario.friction < 0.99:
+        for geom_id in terrain_ids:
+            model.geom_friction[geom_id, 0] = scenario.friction
+        if scenario.friction < 0.99:
+            for body_name in (LEFT_FOOT_BODY, RIGHT_FOOT_BODY):
+                for geom_id in _body_geoms(model, body_name):
+                    model.geom_friction[geom_id, 0] = scenario.friction
     mujoco.mj_forward(model, data)
     pelvis = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
     session = ort.InferenceSession(str(args.policy), providers=["CPUExecutionProvider"])
@@ -92,7 +156,7 @@ def main() -> None:
         raise SystemExit("unexpected v26 ONNX input/output contract")
     history, previous_target = V26ObservationHistory(), None
     robot_geom_ids = np.flatnonzero(model.geom_bodyid > 0)
-    visibility: list[tuple[int, int]] = []
+    visibility: list[tuple[int, int, int]] = []
     start_x, min_height, max_tilt, fell, completed = float(data.qpos[0]), 10.0, 0.0, False, 0
     encoder = subprocess.Popen(
         [
@@ -122,8 +186,18 @@ def main() -> None:
         stdin=subprocess.PIPE,
     )
     renderer = mujoco.Renderer(model, height=720, width=1280)
+    physics_step = 0
+    storm_rng = np.random.default_rng((args.seed or 0) + 991)
+    wind_speed_mps = 0.0
     try:
         for step in range(args.steps):
+            if scenario is not None and scenario.actuator_health < 1.0 and step >= 200:
+                alpha = min(1.0, (step - 200) / 50.0)
+                health = 1.0 + alpha * (scenario.actuator_health - 1.0)
+                for index, aid in enumerate(aids):
+                    model.actuator_gainprm[aid, 0] = KP[index] * health
+                    model.actuator_biasprm[aid, 1] = -KP[index] * health
+                    model.actuator_biasprm[aid, 2] = -KD[index] * health
             velocity = np.zeros(6)
             mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_BODY, pelvis, velocity, 1)
             observation = history.build(
@@ -142,8 +216,14 @@ def main() -> None:
                 target = np.clip(target, previous_target - 0.2, previous_target + 0.2)
             previous_target = target.copy()
             data.ctrl[aids] = target
+            wind_speed_mps = wind_speed_at_step(step, wind_target_mps)
+            drag_force = aerodynamic_force_n(wind_speed_mps)
             for _ in range(10):
+                if scenario is not None:
+                    disturbances.apply_disturbance_wrench(model, data, scenario, physics_step)
+                data.xfrc_applied[pelvis, 1] += drag_force
                 mujoco.mj_step(model, data)
+                physics_step += 1
             gravity = projected_gravity(data.qpos[3:7])
             tilt = float(np.degrees(np.arccos(np.clip(-gravity[2], -1, 1))))
             min_height, max_tilt, completed = (
@@ -155,20 +235,26 @@ def main() -> None:
                 camera = mujoco.MjvCamera()
                 camera.type, camera.distance, camera.azimuth, camera.elevation = (
                     mujoco.mjtCamera.mjCAMERA_FREE,
-                    4.0,
+                    3.3,
                     90,
                     -20,
                 )
                 camera.lookat[:] = [float(data.qpos[0]) + 0.1, 0, 0.62]
                 renderer.update_scene(data, camera=camera)
                 assert encoder.stdin is not None
-                encoder.stdin.write(renderer.render().tobytes())
+                frame = renderer.render()
+                frame = _blowing_snow(frame, storm_rng, wind_speed_mps)
+                encoder.stdin.write(frame.tobytes())
                 if step % 50 == 0:
                     renderer.enable_segmentation_rendering()
                     renderer.update_scene(data, camera=camera)
-                    visibility.append(robot_visibility(renderer.render(), robot_geom_ids))
+                    segmentation = renderer.render()
+                    pixels, height_px = robot_visibility(segmentation, robot_geom_ids)
+                    visibility.append(
+                        (pixels, height_px, _robot_frame_margin(segmentation, robot_geom_ids))
+                    )
                     renderer.disable_segmentation_rendering()
-            if data.qpos[2] < 0.5 or tilt > 50:
+            if data.qpos[2] < FALL_PELVIS_Z_M or tilt > FALL_TILT_DEG:
                 fell = True
                 break
     finally:
@@ -180,10 +266,12 @@ def main() -> None:
         raise SystemExit("ffmpeg failed")
     min_pixels = min((value[0] for value in visibility), default=0)
     min_height_px = min((value[1] for value in visibility), default=0)
-    if min_pixels < 5000 or min_height_px < 120:
+    min_frame_margin_px = min((value[2] for value in visibility), default=0)
+    if min_pixels < 3500 or min_height_px < 150 or min_frame_margin_px < 30:
         args.output.unlink(missing_ok=True)
         raise SystemExit(
-            f"robot visibility gate failed: {min_pixels} pixels, {min_height_px}px tall"
+            f"robot visibility gate failed: {min_pixels} pixels, {min_height_px}px tall, "
+            f"{min_frame_margin_px}px border margin"
         )
     report = {
         "policy": "v26 iter42290 frozen",
@@ -196,7 +284,17 @@ def main() -> None:
         "max_tilt_deg": max_tilt,
         "minimum_robot_pixels": min_pixels,
         "minimum_robot_height_px": min_height_px,
+        "minimum_robot_frame_margin_px": min_frame_margin_px,
         "visibility_gate": "PASS",
+        "category": args.category,
+        "seed": args.seed,
+        "storm": wind_target_mps >= 25.0,
+        "terrain_zone": terrain_zone,
+        "wind_target_mps": wind_target_mps,
+        "wind_physics_applied": True,
+        "wind_speed_at_end_mps": wind_speed_mps,
+        "wind_speed_at_end_kmh": wind_speed_mps * 3.6,
+        "snow_rendering": "deterministic visual overlay; physics from aerodynamic force",
     }
     args.output.with_suffix(".json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"

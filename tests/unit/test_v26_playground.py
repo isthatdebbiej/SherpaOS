@@ -1,6 +1,15 @@
 import numpy as np
 
-from sherpaos.sim.himalaya_scene import scene_xml
+from sherpaos.sim.himalaya_scene import (
+    TERRAIN_ZONE_LENGTHS_M,
+    TERRAIN_ZONE_NAMES,
+    TERRAIN_ZONE_PROFILES,
+    scene_xml,
+    terrain_heightmap,
+    terrain_slope_deg_at,
+    terrain_slope_for_geom,
+    write_terrain_png,
+)
 from sherpaos.sim.v26_playground import (
     DEFAULT_POSE,
     V26ObservationHistory,
@@ -30,9 +39,35 @@ def test_visibility_measurement() -> None:
     assert robot_visibility(segmentation, np.array([7])) == (132, 11)
 
 
-def test_scene_has_full_g1_and_no_occluding_mountains() -> None:
-    xml = scene_xml()
-    assert '<include file="g1.xml"/>' in xml
-    assert 'name="steep_boundary"' in xml and 'name="cross_slope"' in xml
-    assert "mountain" not in xml.lower()
+def test_scene_uses_connected_visible_collision_segments() -> None:
+    scenes = [scene_xml(index) for index in range(len(TERRAIN_ZONE_NAMES))]
+    assert all('<include file="g1.xml"/>' in xml for xml in scenes)
+    assert all('name="spawn_apron" type="box"' in xml for xml in scenes)
+    assert all(
+        all(f'name="terrain_segment_{index}" type="box"' in xml for index in range(4))
+        for xml in scenes
+    )
+    assert all("ridge_" not in xml for xml in scenes)
     np.testing.assert_allclose(projected_gravity(np.array([1, 0, 0, 0])), [0, 0, -1])
+    assert TERRAIN_ZONE_PROFILES[0] == (2.0, 4.0, 5.0, 4.0)
+    assert TERRAIN_ZONE_PROFILES[4] == (10.0, 16.0, 22.0, 30.0)
+    assert TERRAIN_ZONE_LENGTHS_M[4] == (0.65, 0.90, 1.30, 2.65)
+    assert all(abs(sum(lengths) - 4.5) < 1e-9 for lengths in TERRAIN_ZONE_LENGTHS_M[:4])
+    assert abs(sum(TERRAIN_ZONE_LENGTHS_M[4]) - 5.5) < 1e-9
+    assert terrain_slope_for_geom(4, "terrain_segment_2") == 22.0
+    assert terrain_slope_for_geom(4, "spawn_apron") == 0.0
+
+
+def test_himalayan_heightfields_are_deterministic_distinct_and_spawn_flat(tmp_path) -> None:
+    maps = [terrain_heightmap(index) for index in range(len(TERRAIN_ZONE_NAMES))]
+    assert all(value.shape == (129, 129) for value in maps)
+    assert all(np.isfinite(value).all() and 0 <= value.min() <= value.max() <= 1 for value in maps)
+    assert all(np.ptp(value[:, :70]) == 0 for value in maps)
+    assert len({value.tobytes() for value in maps}) == len(maps)
+    np.testing.assert_array_equal(maps[4], terrain_heightmap(4))
+    assert terrain_slope_deg_at(0, 0.0, 0.0) == 0.0
+    assert 3.0 <= terrain_slope_deg_at(0, 5.0, 0.0) <= 5.0
+    assert 27.0 <= terrain_slope_deg_at(4, 5.0, 0.0) <= 31.0
+    output = tmp_path / "terrain.png"
+    write_terrain_png(output, 4)
+    assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")

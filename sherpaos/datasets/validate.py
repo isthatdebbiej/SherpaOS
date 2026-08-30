@@ -45,30 +45,46 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
     split = read_json(dataset / "split_manifest.json")
     requested = int(scenario.get("episodes_requested", -1))
     contract_mode = bool(scenario.get("contract_mode", False))
-    expected = 2 if contract_mode else 200
+    qualification_mode = bool(scenario.get("qualification_mode", False))
+    expected = 2 if contract_mode else (20 if qualification_mode else 200)
     completed = scenario.get("completed", [])
     completed_ids = [row.get("episode_id") for row in completed]
     if requested != expected or len(completed_ids) != expected:
         errors.append(f"expected exactly {expected} completed episodes, got {len(completed_ids)}")
     if len(set(completed_ids)) != len(completed_ids):
         errors.append("duplicate episode IDs")
+    if not contract_mode:
+        missed_steep = [
+            row.get("episode_id")
+            for row in completed
+            if row.get("terrain_zone") == 4 and float(row.get("max_slope_deg", 0.0)) < 15.5
+        ]
+        if missed_steep:
+            errors.append(
+                "steep terrain scenarios never contacted a >=16 degree segment: "
+                + ", ".join(str(value) for value in missed_steep)
+            )
 
     shard_size = int(scenario.get("settings", {}).get("shard_episodes", 10))
     expected_shards = math.ceil(expected / shard_size)
     observation_paths = sorted((dataset / "observations").glob("shard-*.npz"))
     label_paths = sorted((dataset / "labels").glob("shard-*.npz"))
+    context_paths = sorted((dataset / "context").glob("shard-*.npz"))
     expected_names = [f"shard-{index:03d}.npz" for index in range(expected_shards)]
     if [path.name for path in observation_paths] != expected_names:
         errors.append("missing or unexpected observation shards")
     if [path.name for path in label_paths] != expected_names:
         errors.append("missing or unexpected label shards")
+    if [path.name for path in context_paths] != expected_names:
+        errors.append("missing or unexpected context shards")
 
     mobility_parts: list[np.ndarray] = []
     dynamics_parts: list[np.ndarray] = []
     for name in expected_names:
         observation_path = dataset / "observations" / name
         label_path = dataset / "labels" / name
-        if not observation_path.is_file() or not label_path.is_file():
+        context_path = dataset / "context" / name
+        if not observation_path.is_file() or not label_path.is_file() or not context_path.is_file():
             continue
         try:
             with (
@@ -76,6 +92,9 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
                 np.load(label_path, allow_pickle=False) as labels,
             ):
                 _validate_pair(observations, labels, errors, name)
+                with np.load(context_path, allow_pickle=False) as context:
+                    if len(context["episode_ids"]) != int(np.sum(labels["completed_steps"])):
+                        errors.append(f"context/telemetry length mismatch in {name}")
                 mobility_parts.append(np.asarray(labels["mobility_targets"]))
                 dynamics_parts.append(np.asarray(labels["dynamics_targets"]))
         except (OSError, ValueError, KeyError) as exc:

@@ -48,6 +48,10 @@ DEFAULT_WINDOW_SIZE = 100
 # jitter (a frame or two) while still catching a genuinely stalled feed
 # quickly (well under a second).
 DEFAULT_STALE_THRESHOLD_SECONDS = 0.25
+# Tolerate small clock-domain jitter, but reject telemetry materially ahead
+# of the runtime clock. RobotTelemetry.age_seconds() intentionally clips at
+# zero, so this condition must be tracked separately.
+DEFAULT_FUTURE_TOLERANCE_SECONDS = 0.05
 
 # Sentinel age used only when features are computed on a window that has
 # never had a sample pushed into it. This should be unreachable via
@@ -108,6 +112,7 @@ class Features:
     is_stale: bool
     has_nan: bool
     is_out_of_order: bool
+    is_future_dated: bool
     missing_optional_fields: tuple[str, ...]
     producer_invalid: bool
     sample_count: int
@@ -347,6 +352,7 @@ def _empty_features() -> Features:
         is_stale=True,
         has_nan=True,
         is_out_of_order=False,
+        is_future_dated=False,
         missing_optional_fields=(),
         producer_invalid=True,
         sample_count=0,
@@ -437,6 +443,13 @@ class FeatureWindow:
             producer_invalid = True
         is_stale = age_seconds > self.stale_threshold_seconds
         is_out_of_order = self._last_is_out_of_order
+        try:
+            is_future_dated = (
+                float(latest.monotonic_time) - float(now_monotonic)
+                > DEFAULT_FUTURE_TOLERANCE_SECONDS
+            )
+        except Exception:
+            is_future_dated = True
 
         roll, pitch = _quat_to_roll_pitch(latest.base_orientation)
         angular_velocity_magnitude = _safe_norm(latest.base_angular_velocity)
@@ -498,6 +511,7 @@ class FeatureWindow:
             is_stale=is_stale,
             has_nan=has_nan,
             is_out_of_order=is_out_of_order,
+            is_future_dated=is_future_dated,
             missing_optional_fields=missing_optional,
             producer_invalid=producer_invalid,
             sample_count=len(buf),

@@ -6,12 +6,11 @@ import numpy as np
 
 from sherpaos.contracts import RobotTelemetry
 from sherpaos.datasets.schema import OBSERVATION_WIDTH, WindowedRiskDataset, telemetry_vector
-from sherpaos.evaluation.ground_truth import (
-    DEFAULT_ACTUATOR_HEALTH_UNSAFE,
-    DEFAULT_FOOT_SLIP_UNSAFE_MPS,
-    DEFAULT_TILT_UNSAFE_DEG,
-    ScenarioGroundTruth,
-)
+from sherpaos.evaluation.ground_truth import ScenarioGroundTruth
+
+MOBILITY_SLIP_UNSAFE_MPS = 0.8
+DYNAMICS_TILT_UNSAFE_DEG = 25.0
+DYNAMICS_ACTUATOR_HEALTH_UNSAFE = 0.90
 
 
 def build_episode_windows(
@@ -24,6 +23,7 @@ def build_episode_windows(
     horizon_steps: int,
     stride: int = 1,
     fell: bool = False,
+    mobility_failure: bool = False,
 ) -> WindowedRiskDataset:
     if len(telemetry) != len(truth):
         raise ValueError("telemetry and privileged truth must be index-aligned")
@@ -37,31 +37,28 @@ def build_episode_windows(
     falls: list[float] = []
     ids: list[str] = []
     groups: list[str] = []
-    last_end = len(telemetry) - horizon_steps
+    last_end = len(telemetry) if fell else len(telemetry) - horizon_steps
     for end in range(window_steps, last_end + 1, stride):
         future = truth[end : end + horizon_steps]
+        fall_in_horizon = fell and end + horizon_steps >= len(telemetry)
         windows.append(encoded[end - window_steps : end])
         mobility.append(
             float(
-                any(
-                    (
-                        item.true_friction <= 0.15
-                        or item.planted_foot_slip_mps >= DEFAULT_FOOT_SLIP_UNSAFE_MPS
-                    )
-                    for item in future
-                )
+                (mobility_failure and fall_in_horizon)
+                or any(item.planted_foot_slip_mps >= MOBILITY_SLIP_UNSAFE_MPS for item in future)
             )
         )
         dynamics.append(
             float(
-                any(
-                    item.tilt_from_vertical_deg >= DEFAULT_TILT_UNSAFE_DEG
-                    or item.actuator_health <= DEFAULT_ACTUATOR_HEALTH_UNSAFE
+                fall_in_horizon
+                or any(
+                    item.tilt_from_vertical_deg >= DYNAMICS_TILT_UNSAFE_DEG
+                    or item.actuator_health <= DYNAMICS_ACTUATOR_HEALTH_UNSAFE
                     for item in future
                 )
             )
         )
-        falls.append(float(fell and end + horizon_steps >= len(telemetry)))
+        falls.append(float(fall_in_horizon))
         ids.append(episode_id)
         groups.append(scenario_group)
 
