@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 from pathlib import Path
 from typing import Any
@@ -94,6 +95,7 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
     dynamics_parts: list[np.ndarray] = []
     warning_episodes: set[str] = set()
     risk_episodes: set[str] = set()
+    observation_digests: dict[str, str] = {}
     for name in expected_names:
         observation_path = dataset / "observations" / name
         label_path = dataset / "labels" / name
@@ -112,6 +114,18 @@ def validate_dataset(dataset: Path) -> dict[str, Any]:
                 mobility_parts.append(np.asarray(labels["mobility_targets"]))
                 dynamics_parts.append(np.asarray(labels["dynamics_targets"]))
                 episode_ids = np.asarray(labels["episode_ids"])
+                observation_episode_ids = np.asarray(observations["episode_ids"])
+                for episode_id in np.unique(observation_episode_ids):
+                    episode_windows = observations["observations"][
+                        observation_episode_ids == episode_id
+                    ]
+                    digest = hashlib.sha256(episode_windows.tobytes()).hexdigest()
+                    previous = observation_digests.get(digest)
+                    if previous is not None:
+                        errors.append(
+                            f"duplicate observation trajectory: {previous} and {episode_id}"
+                        )
+                    observation_digests[digest] = str(episode_id)
                 risk = np.maximum(labels["mobility_targets"], labels["dynamics_targets"])
                 for episode_id in np.unique(episode_ids):
                     values = risk[episode_ids == episode_id]

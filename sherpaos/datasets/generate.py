@@ -42,7 +42,7 @@ PROVENANCE_FILES = (
     "sherpaos/sim/weather.py",
 )
 LABEL_RULE_VERSION = "risk-horizon-v4-causal-fall"
-SHARD_SCHEMA_VERSION = 2
+SHARD_SCHEMA_VERSION = 3
 
 
 def load_matrix(path: Path) -> dict[str, Any]:
@@ -133,13 +133,17 @@ def scenario_for(category: str, seed: int) -> Scenario:
 
 def _command_for(category_index: int) -> tuple[float, float, float]:
     """Matched command families shared by every category."""
-    return (
+    base = (
         (0.25, 0.0, 0.0),
         (0.40, 0.0, 0.0),
         (0.30, 0.0, 0.10),
         (0.30, 0.0, 0.0),
         (0.35, 0.0, -0.05),
     )[category_index % 5]
+    group = category_index // 5
+    speed_delta = (group - 4.5) * 0.004
+    yaw_delta = ((group % 3) - 1) * 0.003
+    return (base[0] + speed_delta, base[1], base[2] + yaw_delta)
 
 
 def _terrain_zone_for(category: str, category_index: int) -> int:
@@ -160,12 +164,16 @@ def _route_fraction_for(category_index: int) -> float:
 def _wind_for(category: str, category_index: int) -> float:
     """Deterministic Himalayan wind targets, including repeated 200 km/h stress."""
     targets = {
-        "nominal": (5.0, 6.0, 8.0, 10.0, 5.0, 8.0, 10.0, 12.0, 15.0, 10.0),
+        "nominal": (5.0, 6.0, 7.0, 8.0, 5.0, 6.0, 7.0, 8.0, 6.0, 7.0),
         "mobility": (5.0, 8.0, 10.0, 8.0, 15.0, 10.0, 12.0, 15.0, 8.0, 12.0),
         "dynamics": (8.0, 10.0, 12.0, 15.0, 25.0, 12.0, 15.0, 18.0, 22.0, 15.0),
         "combined": (10.0, 15.0, 25.0, 35.0, 55.6, 15.0, 20.0, 30.0, 45.0, 55.6),
     }
-    return targets[category][category_index % 10]
+    target = targets[category][category_index % 10]
+    if target >= 50.0:
+        return target
+    group_offset = (-0.4, -0.2, 0.0, 0.2, 0.4)[category_index // 10]
+    return target + group_offset
 
 
 def generate_dataset(matrix_path: Path, episodes: int, output: Path) -> dict[str, Any]:
@@ -212,6 +220,7 @@ def generate_dataset(matrix_path: Path, episodes: int, output: Path) -> dict[str
         shard_rows: list[dict[str, Any]] = []
         for spec in shard_specs:
             scenario = scenario_for(spec["category"], spec["seed"])
+            command = _command_for(spec["category_index"])
             policy_path = os.environ.get("SHERPA_V26_POLICY")
             if policy_path:
                 from sherpaos.sim.v26_runner import run_v26_episode
@@ -222,7 +231,7 @@ def generate_dataset(matrix_path: Path, episodes: int, output: Path) -> dict[str
                     policy_path=Path(policy_path),
                     g1_dir=Path(os.environ["SHERPA_G1_DIR"]),
                     max_steps=500,
-                    command=_command_for(spec["category_index"]),
+                    command=command,
                     terrain_zone=_terrain_zone_for(spec["category"], spec["category_index"]),
                     wind_target_mps=_wind_for(spec["category"], spec["category_index"]),
                 )
@@ -263,6 +272,7 @@ def generate_dataset(matrix_path: Path, episodes: int, output: Path) -> dict[str
                     "unsafe_steps": sum(item.true_unsafe for item in result.ground_truth),
                     "terrain_zone": _terrain_zone_for(spec["category"], spec["category_index"]),
                     "wind_target_mps": _wind_for(spec["category"], spec["category_index"]),
+                    "command": list(command),
                     "scenario": _jsonable_scenario(scenario),
                 }
             )
@@ -347,6 +357,7 @@ def _episode_rows_from_label(path: Path, specs: list[dict[str, Any]]) -> list[di
         unsafe_steps = labels["episode_unsafe_steps"].tolist()
         terrain_zones = labels["episode_terrain_zone"].tolist()
         winds = labels["episode_wind_target_mps"].tolist()
+        commands = labels["episode_command"].tolist()
         scenarios = [json.loads(value) for value in labels["episode_scenario_json"].tolist()]
     return [
         {
@@ -360,9 +371,23 @@ def _episode_rows_from_label(path: Path, specs: list[dict[str, Any]]) -> list[di
             "unsafe_steps": int(unsafe),
             "terrain_zone": int(zone),
             "wind_target_mps": float(wind),
+            "command": [float(value) for value in command],
             "scenario": scenario,
         }
-        for spec, step, fell, count, slip, tilt, slope, unsafe, zone, wind, scenario in zip(
+        for (
+            spec,
+            step,
+            fell,
+            count,
+            slip,
+            tilt,
+            slope,
+            unsafe,
+            zone,
+            wind,
+            command,
+            scenario,
+        ) in zip(
             specs,
             steps,
             falls,
@@ -373,6 +398,7 @@ def _episode_rows_from_label(path: Path, specs: list[dict[str, Any]]) -> list[di
             unsafe_steps,
             terrain_zones,
             winds,
+            commands,
             scenarios,
             strict=True,
         )
@@ -419,8 +445,9 @@ def _write_shard(
         episode_unsafe_steps=np.asarray([row["unsafe_steps"] for row in rows], dtype=np.int32),
         episode_terrain_zone=np.asarray([row["terrain_zone"] for row in rows], dtype=np.int8),
         episode_wind_target_mps=np.asarray(
-            [row["wind_target_mps"] for row in rows], dtype=np.float32
+            [row["wind_target_mps"] for row in rows], dtype=np.float64
         ),
+        episode_command=np.asarray([row["command"] for row in rows], dtype=np.float64),
         episode_scenario_json=np.asarray(
             [json.dumps(row["scenario"], sort_keys=True) for row in rows], dtype=str
         ),

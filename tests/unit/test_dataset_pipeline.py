@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from sherpaos.contracts import RobotTelemetry
-from sherpaos.datasets.generate import generate_dataset
+from sherpaos.datasets.generate import _command_for, _wind_for, generate_dataset
 from sherpaos.datasets.manifest import read_json, write_checksums
 from sherpaos.datasets.split import build_split_manifest
 from sherpaos.datasets.validate import DatasetValidationError, validate_dataset
@@ -115,6 +115,16 @@ def test_group_split_isolation(
         assert split == manifest["groups"][f"{category}-group-00"]
 
 
+def test_production_conditions_are_deterministically_diverse() -> None:
+    commands = [_command_for(index) for index in range(50)]
+    nominal_winds = [_wind_for("nominal", index) for index in range(50)]
+    assert len(set(commands)) == 50
+    assert len(set(nominal_winds)) > 10
+    assert max(nominal_winds) <= 8.4
+    assert _wind_for("combined", 4) == 55.6
+    assert _wind_for("combined", 44) == 55.6
+
+
 def test_resumability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_path: Path) -> None:
     calls = 0
 
@@ -147,6 +157,24 @@ def test_checksum_corruption_detection(
     with path.open("ab") as handle:
         handle.write(b"corrupt")
     with pytest.raises(DatasetValidationError, match="checksum mismatch"):
+        validate_dataset(output)
+
+
+def test_duplicate_observation_trajectory_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matrix_path: Path
+) -> None:
+    monkeypatch.setattr("sherpaos.datasets.generate.run_episode", _fake_episode)
+    output = tmp_path / "duplicate-trajectory"
+    generate_dataset(matrix_path, 2, output)
+    path = output / "observations/shard-000.npz"
+    with np.load(path, allow_pickle=False) as artifact:
+        values = {key: artifact[key] for key in artifact.files}
+    ids = values["episode_ids"]
+    first = values["observations"][ids == "episode-000"]
+    values["observations"][ids == "episode-050"] = first
+    np.savez_compressed(path, **values)
+    write_checksums(output)
+    with pytest.raises(DatasetValidationError, match="duplicate observation trajectory"):
         validate_dataset(output)
 
 
