@@ -19,6 +19,18 @@ always-slow policy.
 Every intervention has a reason, timestamp, input-freshness result, requested action,
 applied/rejected receipt, and incident evidence bundle.
 
+The demo product additionally includes Pemba's Field Journal. This is a post-mission
+experience layer: it reads verified per-day expedition artifacts, presents the approved
+five-day plan, and creates written/spoken reflections. It cannot command the robot or
+modify a `GuardDecision`.
+
+## Deployment decision
+
+All deployable components run on the existing Vultr host: ROS-bag storage, inspection,
+report extraction, reflection/voice worker, Python API, Next.js frontend, and durable
+diary/audio artifacts. Vercel and Hugging Face are not deployment dependencies. The
+offline supervisor remains runnable with all cloud and LLM credentials absent.
+
 ## Must work with all of these absent
 
 physical robot, host telemetry dump, internet, Hugging Face, Vultr, Jetson Thor, remote
@@ -46,10 +58,23 @@ G1 connection. Those resources improve evidence; none may be a stage dependency.
 
 ## Explicitly out of scope until every mandatory gate is green
 
-photorealistic or full-Himalaya 3D rendering, calibrated energy-to-return prediction
-beyond the bounded simulated battery-margin guard, LiveKit voice, phone teleop, ROS 2
-bridge, Isaac Sim/Lab, TensorRT, second UI, new locomotion policy. (The small offline
-geographic-risk artifact/guard itself is in scope — only fancy 3D map rendering is cut.)
+photorealistic terrain requiring a game-engine runtime, calibrated energy-to-return
+prediction beyond the bounded simulated battery-margin guard, LiveKit, phone teleop,
+ROS 2 control bridge, Isaac Sim/Lab, TensorRT, a second safety dashboard, and a new
+locomotion policy. The Field Journal is the approved presentation UI; its terrain is
+original code-drawn relief, not safety-relevant geographic data.
+
+## Field Journal acceptance gates
+
+- Five days are represented with approved plan data and explicit locked/current/complete
+  state.
+- Completed days show persisted written reflection; the current day may speak its
+  reflection/thoughts; future days do not invent results.
+- Every factual diary claim can reference a verified report/event or be marked as
+  expressive interpretation.
+- Raw bags and secrets never enter browser bundles.
+- `OPENAI_API_KEY` is server-only and the app remains usable when it is absent.
+- The production web build succeeds and the UI supports reduced motion.
 
 ## Simulation fallback (recorded decision)
 

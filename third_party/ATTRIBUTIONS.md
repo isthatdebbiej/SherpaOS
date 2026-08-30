@@ -10,6 +10,11 @@
 | Ruff | Lint/format | see `pyproject.toml` | MIT |
 | ONNX / ONNX Runtime | Model export/parity (only if a learned model ships) | see `pyproject.toml` | Apache-2.0 / MIT |
 | English Wikipedia (waypoint coordinates/elevations) | `configs/terrain/ebc_route.json` geographic-risk guard artifact | fetched 2026-08-29, see `configs/terrain/PROVENANCE.md` for per-waypoint URLs | CC BY-SA 4.0 (raw geographic facts — coordinates/elevations — are not independently copyrightable, but the source is credited per Wikipedia's terms) |
+| Next.js / React | Pemba's Field Journal application/runtime | `next 16.3.3`, `react/react-dom 19.2.8` (see `web/package-lock.json`) | MIT |
+| Motion | Field Journal transitions and interactive motion | `13.1.1` | MIT |
+| Three.js / React Three Fiber / Drei | Reserved web-native 3D rendering dependencies for the Field Journal; current terrain is SVG/CSS | `three 0.185.1`, `@react-three/fiber 9.7.0`, `@react-three/drei 10.7.8` | MIT |
+| Howler.js | Reserved narration/ambient audio playback dependency | `2.2.4` | MIT |
+| Zustand | Reserved client expedition-state dependency | `5.0.15` | MIT |
 
 Update this table whenever a new dependency, pretrained model, or dataset is added, with
 the exact pinned commit/version and license. This file must be accurate before

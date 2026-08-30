@@ -2,8 +2,9 @@
 
 **Last updated:** 2026-08-29 PT
 **Base SHA:** `f8562169` (dataset-pipeline implementation base)
-**Working tree:** dataset pipeline implementation ready for commit
-**Test state:** Ruff green; full pytest suite green (150 passed); 2-episode dataset contract GREEN
+**Working tree:** uncommitted dataset, expedition-memory, Field Journal, and documentation work
+**Latest Python verification on record:** Ruff green; full pytest suite green (150 passed); 2-episode dataset contract GREEN
+**Latest web verification:** Next.js 16.3.3 production build GREEN after the animated trail redesign
 
 ## Implemented
 
@@ -14,9 +15,13 @@
   push-to-talk audio turns. Voice turns are locked until a verified bag exists and
   require `OPENAI_API_KEY`; the model receives the verified bag hash and approved
   topic coverage, never simulator truth or actuation authority.
-- Field Journal Memory Radio UI with real day selection, upload status, manifest
-  checksum/message/topic display, half-duplex microphone capture, grounded transcript,
-  and spoken response playback.
+- Expedition-memory backend routes support real day selection, upload status, manifest
+  checksum/message/topic data, and grounded read-only voice turns. The redesigned
+  frontend has not yet reconnected these routes.
+- Redesigned `web/` presentation shell with original Everest relief/topographic styling,
+  animated central ascent, clickable five-day navigation, written past-day entries,
+  current-day spoken-thought fixture, locked future days, Pemba reactions, snow/parallax,
+  memory charms, lantern mode, responsive layout, and reduced-motion support.
 
 - MuJoCo Menagerie G1 posture/stepping simulator with nominal, mixed-traction,
   disturbance, actuator-health, slope, sensor-noise, and synthetic battery scenarios.
@@ -66,14 +71,30 @@ Git commands in evidence generation now pass the repository as an explicit safe 
 - Full pytest suite and Ruff are green; the Next.js production build is green.
 - Live voice was not called during verification because no API credential was supplied.
 
+## Field Journal / Vultr checkpoint (2026-08-29 PT)
+
+- Deployment is now Vultr-only. Vercel and Hugging Face are not application dependencies.
+- The intended Vultr layout keeps raw day bags, derived reports, diary JSON, narration,
+  Python API, and Next.js app on the same host.
+- No general Vultr account API key is required for the app to read local instance files.
+  Real reflection/voice requires a server-only `OPENAI_API_KEY`; uploads/completion
+  notifications require a separate application secret.
+- The new visual experience is currently fixture-driven and is not yet connected to the
+  existing expedition API. Browser `speechSynthesis` is a temporary interaction fixture,
+  not the final narration path.
+- `npm run build` passes. Browser QA confirmed clickable past diary entries, current-day
+  thought controls, locked future days, and the Everest-style vertical route composition.
+- Documentation was reconciled across the workspace plan, README, scope, contracts,
+  decisions, runbook, status, handoff, attribution, and web README.
+
 ## Next three tasks
 
-1. Review and commit this integration checkpoint; Vultr validation intentionally refuses
-   dirty-tree evidence.
-2. Run `scripts/vultr_playground_smoke.sh` on the provisioned GPU and retrieve its logs.
-3. Obtain or train a compatible, licensed G1 policy, wire its task-specific observation
-   layout to the adapter, and generate a supervised MP4 rollout. Environment smoke alone
-   is not locomotion evidence.
+1. Freeze a derived `DayReport`/`DiaryEntry` API contract and connect the redesigned
+   Next.js page to `sherpaos.expedition.api` without sending raw bags to the browser.
+2. Add the post-day reflection and narration worker on Vultr; persist evidence references,
+   diary JSON, and audio beside each immutable day.
+3. Add Vultr systemd plus nginx/Caddy deployment files, run clean-host verification, and
+   commit/tag the integration checkpoint before generating judging evidence.
 
 ## Dataset pipeline checkpoint (2026-08-29 PT)
 
